@@ -47,7 +47,8 @@ function doPost(e) {
     lock.waitLock(20000);
     try {
       var res = write(body.op, body.path, body.data);
-      CacheService.getScriptCache().put('ver', String(res.updated), 21600);
+      /* Kept for 30 seconds only: Colette's Board writes to the sheet directly, so a full re-read happens at least that often. */
+      CacheService.getScriptCache().put('ver', String(res.updated), 30);
       return out({ ok: true, role: role, updated: res.updated, data: res.data });
     } finally { lock.releaseLock(); }
   } catch (err) {
