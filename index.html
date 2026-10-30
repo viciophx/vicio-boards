@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vicio</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍕</text></svg>">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@600;700&family=Public+Sans:wght@400;600&display=swap">
+<style>
+:root{--bg:#F6F5F3;--ink:#18181B;--muted:#5E5E66;--line:#E4E2DF;--cherry:#8B1E1E;--cherry-ink:#FFFFFF;--surface:#FFFFFF;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root{--bg:#161214;--ink:#F3EFEF;--muted:#B4ABAD;--line:#3A3134;--cherry:#C8484A;--cherry-ink:#FFFFFF;--surface:#211B1D;color-scheme:dark}}
+*,*::before,*::after{box-sizing:inherit}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.5 "Public Sans",system-ui,sans-serif;display:flex;flex-direction:column}
+main{flex:1;display:flex;flex-direction:column;justify-content:center;gap:28px;width:min(100%,460px);margin:0 auto;padding:32px 20px}
+h1{font:700 clamp(56px,18vw,96px)/.9 Oswald,Impact,sans-serif;letter-spacing:-.01em;margin:0;color:var(--cherry)}
+p{margin:0;color:var(--muted)}
+nav{display:grid;gap:12px}
+a.board{display:flex;justify-content:space-between;align-items:center;gap:16px;text-decoration:none;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--cherry);border-radius:10px;padding:20px 18px;min-height:84px}
+a.board b{font:600 26px/1.1 Oswald,Impact,sans-serif}
+a.board span{color:var(--muted);font-size:14px;text-align:right}
+a.board:focus-visible{outline:3px solid var(--cherry);outline-offset:3px}
+small{color:var(--muted);font-size:13px}
+button{font:600 13px "Public Sans",system-ui,sans-serif;background:none;border:0;color:var(--cherry);padding:6px 0;cursor:pointer;text-decoration:underline}
+</style>
+</head>
+<body>
+<main>
+  <div>
+    <h1>Vicio</h1>
+    <p>Pick your side of the house. Checks save for the whole team.</p>
+  </div>
+  <nav aria-label="Boards">
+    <a class="board" href="kitchen.html"><b>Kitchen</b><span>Prep, logs, dough, cleaning</span></a>
+    <a class="board" href="foh.html"><b>Front of house</b><span>Floor, bar, reservations</span></a>
+  </nav>
+  <small>Asked for a PIN? Get it from your manager. <button type="button" id="forget">Use a different PIN</button></small>
+</main>
+<script>
+document.getElementById('forget').addEventListener('click',function(){try{localStorage.removeItem('vicio_pin')}catch(e){}this.textContent='PIN cleared. Open a board to enter it again.'});
+</script>
+</body>
+</html>
