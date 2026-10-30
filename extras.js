@@ -22,6 +22,7 @@
   };
   if (typeof ES === 'object' && ES) Object.keys(ES_MORE).forEach(function (k) { if (ES[k] == null) ES[k] = ES_MORE[k]; });
   if (BOARD !== 'kitchen') return;
+  document.title = 'Vicio BOH';
 
   function ready() { return typeof VIEWS !== 'undefined' && typeof render === 'function' && typeof save === 'function' && typeof S !== 'undefined' && typeof ui !== 'undefined'; }
   function es() { return typeof lang === 'function' ? lang() === 'es' : false; }
@@ -68,7 +69,7 @@
     var n = document.getElementById('x86-name'), tn = document.getElementById('x86-note');
     var name = ((n && n.value) || '').trim(); if (!name) { if (n) n.focus(); return; }
     var id = typeof newId === 'function' ? newId() : 'k' + Date.now().toString(36);
-    var item = { name: name, note: ((tn && tn.value) || '').trim(), by: who() || 'Kitchen', at: Date.now() };
+    var item = { name: name, note: ((tn && tn.value) || '').trim(), by: who() || 'BOH', at: Date.now() };
     var items = Object.assign({}, (S.e86 && S.e86.items) || {}); items[id] = item;
     S.e86 = Object.assign({}, S.e86, { items: items });
     var p = {}; p[id] = item; save('e86/board', { items: p });
