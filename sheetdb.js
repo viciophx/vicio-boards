@@ -8,9 +8,11 @@
    Collections in SHARED are common to every board; everything else is kept under the board's own prefix,
    the same split Colette's Board uses, so the Kitchen and FOH checklists never overwrite each other. */
 (function () {
+  /* Page add-ons (extras.js) load on every board, connected or not. */
+  try { var xs = document.createElement('script'); xs.src = 'extras.js?v=1'; (document.head || document.documentElement).appendChild(xs); } catch (e) {}
   var API = window.VICIO_API || '';
   if (!API) return;
-  var SHARED = ['events', 'sshifts', 'sstaff', 'schedule', 'caltasks', 'resv'];
+  var SHARED = ['events', 'sshifts', 'sstaff', 'schedule', 'caltasks', 'resv', 'e86'];
   var PREFIX = window.VICIO_BOARD === 'foh' ? 'foh_' : 'kit_';
   function mapPath(p) { p = String(p); return SHARED.indexOf(p.split('/')[0]) >= 0 ? p : PREFIX + p; }
 
