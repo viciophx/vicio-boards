@@ -37,7 +37,7 @@
   var asking = false;
   function askPin() {
     if (asking) return false; asking = true;
-    var v = window.prompt('Enter the Vicio team PIN');
+    var v = window.prompt('Enter the Vicio team PIN\nIngresa el PIN del equipo Vicio');
     asking = false;
     if (v == null) return false;
     setPin(String(v).trim()); return true;
