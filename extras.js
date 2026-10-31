@@ -42,6 +42,13 @@
   function es() { return typeof lang === 'function' ? lang() === 'es' : false; }
   function t(en, esx) { return es() ? esx : en; }
   function who() { return (ui.by || '').trim(); }
+  /* Saves a tap straight to the store, without waiting behind earlier taps, so each one is protected on screen at once. */
+  function quick(path, patch) {
+    if (typeof db === 'undefined' || !db || !db.doc) return save(path, patch);
+    if (typeof setStatus === 'function') setStatus('Saving');
+    return db.doc(path).update(patch).then(function () { if (typeof setStatus === 'function') setStatus('Saved', 'ok'); },
+      function () { if (typeof setStatus === 'function') setStatus('Not saved. Check your access and try again.', 'bad'); });
+  }
   function setWho(n) { ui.by = (n || '').trim(); try { if (ui.by) localStorage.setItem('vicio_by', ui.by); else localStorage.removeItem('vicio_by'); } catch (e) {} render(); }
 
 
@@ -131,7 +138,7 @@
     S.xprep.items = items;
     var nm = on ? (who() || null) : null;
     if (items[id]) { items[id].doneBy = Object.assign({}, items[id].doneBy || {}); items[id].doneBy[d] = nm; }
-    var p = { items: {} }; p.items[id] = { done: {}, doneBy: {} }; p.items[id].done[d] = on; p.items[id].doneBy[d] = nm; save('prepextra/board', p);
+    var p = { items: {} }; p.items[id] = { done: {}, doneBy: {} }; p.items[id].done[d] = on; p.items[id].doneBy[d] = nm; quick('prepextra/board', p);
     setTimeout(annotate, 0);
   }
   function xpPlace() {
@@ -260,19 +267,23 @@
     document.addEventListener('change', function (e) {
       var inp = e.target; if (!inp || !inp.dataset) return;
       if (inp.dataset.xprep) { e.stopImmediatePropagation(); xpTick(inp.dataset.xprep, inp.checked); return; }
+      /* A tap and the initials are saved together, in one write, instead of the board's save plus a second one for the name. */
       var nm = who();
       if (inp.dataset.pdone) {
-        var pd = inp.dataset.pdate || ui.prepDate || iso(new Date()), pb = {}; pb[inp.dataset.pdone] = inp.checked ? (nm || null) : null;
-        if (!nm && inp.checked) return;
-        save('prep/' + pd, { by: pb });
+        e.stopImmediatePropagation();
+        var pd = inp.dataset.pdate || ui.prepDate || iso(new Date()), pid = inp.dataset.pdone, pb = {}, pdn = {};
+        pb[pid] = inp.checked ? (nm || null) : null; pdn[pid] = inp.checked;
+        quick('prep/' + pd, { done: pdn, by: pb });
         S.prep = S.prep || {}; S.prep[pd] = Object.assign({}, S.prep[pd]); S.prep[pd].by = Object.assign({}, S.prep[pd].by || {}, pb);
         setTimeout(annotate, 0);
         return;
       }
       if (!inp.dataset.chk) return;
+      e.stopImmediatePropagation();
       var parts = inp.dataset.chk.split('|'), path = parts[0], id = parts[1];
-      if (!nm && inp.checked) return;
-      var by = {}; by[id] = inp.checked ? nm : null; save(path, { by: by });
+      var by = {}, dn = {}; by[id] = inp.checked ? (nm || null) : null; dn[id] = inp.checked;
+      quick(path, { done: dn, by: by });
+      if (typeof checkListDone === 'function') checkListDone(path, id, inp.checked);
       byDocs[path] = Object.assign({}, byDocs[path] || {}, by);
       if (S.shift && path === 'shifts/' + ui.date) { S.shift.by = Object.assign({}, S.shift.by || {}, by); }
       setTimeout(annotate, 0);
