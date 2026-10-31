@@ -8,8 +8,26 @@
    Collections in SHARED are common to every board; everything else is kept under the board's own prefix,
    the same split Colette's Board uses, so the Kitchen and FOH checklists never overwrite each other. */
 (function () {
-  /* Page add-ons (extras.js) load on every board, connected or not. */
-  try { var xs = document.createElement('script'); xs.src = 'extras.js?v=1'; (document.head || document.documentElement).appendChild(xs); } catch (e) {}
+  /* Page add-ons (extras.js) load on every board, connected or not, always fresh. */
+  try { var xs = document.createElement('script'); xs.src = 'extras.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(xs); } catch (e) {}
+  /* Self-update: a board left open on an iPad never reloads its own code. version.txt changes with every update to the boards;
+     when it does, the page reloads itself the next time nobody is typing, so new features reach the iPads without anyone touching them. */
+  (function () {
+    var build = null;
+    function check() {
+      fetch('version.txt?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (v) {
+        v = String(v || '').trim(); if (!v) return;
+        if (build === null) { build = v; return; }
+        if (v === build) return;
+        var a = document.activeElement;
+        if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || document.getElementById('vicio-pin')) return;
+        location.reload();
+      }).catch(function () {});
+    }
+    check();
+    setInterval(function () { if (!document.hidden) check(); }, 300000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
+  })();
   var API = window.VICIO_API || '';
   if (!API) return;
   var SHARED = ['events', 'sshifts', 'sstaff', 'schedule', 'caltasks', 'resv', 'e86'];
