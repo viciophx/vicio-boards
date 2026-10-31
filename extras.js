@@ -19,7 +19,7 @@
     'Connect Google Drive in Settings, Connectors, to read the schedule sheet.': 'Conecta Google Drive en Ajustes, Conectores, para leer la hoja de turnos.',
     'Could not read the schedule sheet.': 'No se pudo leer la hoja de turnos.', 'The sheet came back empty.': 'La hoja llegó vacía.',
     'Shift mode': 'Modo turno', 'Exit shift mode': 'Salir del modo turno', 'Meatballs': 'Albóndigas',
-    'Build, bottom layer first': 'Armado, de abajo hacia arriba', 'Ingredients': 'Ingredientes', 'Portions and spec': 'Porciones y especificación', 'Procedure': 'Procedimiento', 'Critical rules': 'Reglas críticas', 'Allergens': 'Alérgenos', 'Notes': 'Notas', 'Mods': 'Modificaciones', 'Food cost': 'Costo de alimentos', 'Extra prep': 'Prep extra'
+    'Build, bottom layer first': 'Armado, de abajo hacia arriba', 'Ingredients': 'Ingredientes', 'Portions and spec': 'Porciones y especificación', 'Procedure': 'Procedimiento', 'Critical rules': 'Reglas críticas', 'Allergens': 'Alérgenos', 'Notes': 'Notas', 'Mods': 'Modificaciones', 'Food cost': 'Costo de alimentos', 'Extra prep': 'Prep extra', 'Recipe': 'Receta'
   };
   if (typeof ES === 'object' && ES) Object.keys(ES_MORE).forEach(function (k) { if (ES[k] == null) ES[k] = ES_MORE[k]; });
   if (BOARD !== 'kitchen') return;
@@ -50,60 +50,79 @@
   /* recipes.js lives beside this file on GitHub; on Colette's Board it is inlined, so the load is skipped there. */
   if (!window.VICIO_RECIPES && !window.__vicioInline) { try { var rs = document.createElement('script'); rs.src = 'recipes.js?v=1'; document.head.appendChild(rs); } catch (e) {} }
 
-  /* Extra prep: items a manager forces onto the Prep list regardless of the count. Standing until removed; ticked per day.
-     Stored at prepextra/board as {items:{id:{name, qty, by, at, done:{date:true}}}}, shared by every BOH phone and Colette. */
+  /* Extra prep. A menu of standard items sits at the bottom of the Prep list; tapping one puts it on today's list at the top.
+     Stored at prepextra/board as {items:{id:{name, by, at, done:{date:true}}}, days:{date:{id:true}}}, shared by every BOH phone and Colette.
+     Anyone can add from the menu or take an item off today; adding a brand new item to the menu, or removing one, is for managers. */
   function xpItems() {
     var it = (S.xprep && S.xprep.items) || {};
     return Object.keys(it).map(function (id) { var x = it[id]; return x && x.name ? Object.assign({ id: id }, x) : null; })
       .filter(Boolean).sort(function (a, b) { return (a.at || 0) - (b.at || 0); });
   }
+  function xpDay() { return ui.prepDate || (typeof iso === 'function' ? iso(new Date()) : ''); }
+  function xpToday() { var d = xpDay(); return ((S.xprep && S.xprep.days) || {})[d] || {}; }
+  function xpEd() { return typeof isEditor === 'function' ? isEditor() : true; }
+  function xpRecipe(name) {
+    if (typeof BOOK === 'undefined') return null;
+    return BOOK.flatMap(function (g) { return g.items; }).find(function (r) { return r.name.toLowerCase() === name.toLowerCase(); }) || null;
+  }
   function xpCard() {
-    var d = ui.prepDate || (typeof iso === 'function' ? iso(new Date()) : ''), items = xpItems(), ed = typeof isEditor === 'function' ? isEditor() : true;
+    var d = xpDay(), on = xpToday(), items = xpItems().filter(function (x) { return on[x.id]; });
+    if (!items.length) return '';
     var nDone = items.filter(function (x) { return x.done && x.done[d]; }).length;
     var rows = items.map(function (x) {
-      var rec = typeof BOOK !== 'undefined' ? BOOK.flatMap(function (g) { return g.items; }).find(function (r) { return r.name.toLowerCase() === x.name.toLowerCase(); }) : null;
+      var rec = xpRecipe(x.name);
       return '<li><label><input type="checkbox" data-xprep="' + esc(x.id) + '"' + (x.done && x.done[d] ? ' checked' : '') + '><span><b>' + esc(x.name) + '</b></span></label>' +
-        '<span class="pneed">' + esc(x.qty ? x.qty : t('Extra', 'Extra')) + '</span>' +
+        '<span class="pneed">' + t('Extra', 'Extra') + '</span>' +
         (rec ? '<button type="button" class="btn x" data-act="recipe" data-id="' + esc(rec.id) + '">' + t('Recipe', 'Receta') + '</button>' : '') +
-        (ed ? '<button type="button" class="btn x" data-xprep-del="' + esc(x.id) + '" aria-label="Remove">\u00d7</button>' : '') + '</li>';
+        '<button type="button" class="btn x" data-xprep-off="' + esc(x.id) + '" aria-label="' + t('Take off today', 'Quitar de hoy') + '">\u00d7</button></li>';
     }).join('');
-    return '<section class="card edge x-prep"><div class="cardhead"><h3>Extra prep</h3><span class="count">' + (items.length ? nDone + ' ' + t('of', 'de') + ' ' + items.length : t('Nothing forced', 'Nada forzado')) + '</span></div>' +
-      '<p class="status">' + t('Always on the list, whatever the count says. A manager adds and removes; the crew ticks it off each day.', 'Siempre en la lista, diga lo que diga el conteo. Un gerente agrega y quita; el equipo lo marca cada d\u00eda.') + '</p>' +
-      (items.length ? '<ul class="checks plist">' + rows + '</ul>' : '') +
-      (ed ? '<div class="padd"><input type="text" id="xprep-name" placeholder="' + t('What to prep', 'Qu\u00e9 preparar') + '" autocomplete="off" autocapitalize="sentences">' +
-        '<input type="text" id="xprep-qty" placeholder="' + t('How much', 'Cu\u00e1nto') + '" autocomplete="off" style="width:120px">' +
-        '<button type="button" class="btn primary" data-xprep-add="1">' + t('Add', 'Agregar') + '</button></div>' : '') + '</section>';
+    return '<section class="card edge x-prep"><div class="cardhead"><h3>Extra prep</h3><span class="count">' + nDone + ' ' + t('of', 'de') + ' ' + items.length + '</span></div>' +
+      '<ul class="checks plist">' + rows + '</ul></section>';
   }
+  function xpMenu() {
+    var on = xpToday(), ed = xpEd(), rest = xpItems().filter(function (x) { return !on[x.id]; });
+    var chips = rest.map(function (x) {
+      return '<span style="display:inline-flex;align-items:center;gap:2px"><button type="button" class="btn" data-xprep-on="' + esc(x.id) + '">' + esc(x.name) + '</button>' +
+        (ed && ui.xpEdit ? '<button type="button" class="btn x" data-xprep-del="' + esc(x.id) + '" aria-label="' + t('Remove from menu', 'Quitar del men\u00fa') + '">\u00d7</button>' : '') + '</span>';
+    }).join('');
+    return '<section class="card x-prep-menu"><div class="cardhead"><h3>' + t('Add extra prep', 'Agregar prep extra') + '</h3><span class="count">' + (rest.length ? rest.length + ' ' + t('in the menu', 'en el men\u00fa') : t('All on the list', 'Todo en la lista')) + '</span></div>' +
+      '<p class="status">' + t('Tap an item to put it on today\u2019s list.', 'Toca un art\u00edculo para ponerlo en la lista de hoy.') + '</p>' +
+      (chips ? '<div class="chips">' + chips + '</div>' : '') +
+      (ed ? '<div class="padd" style="margin-top:10px"><input type="text" id="xprep-name" placeholder="' + t('New menu item', 'Nuevo art\u00edculo del men\u00fa') + '" autocomplete="off" autocapitalize="sentences">' +
+        '<button type="button" class="btn primary" data-xprep-add="1">' + t('Add to menu', 'Agregar al men\u00fa') + '</button>' +
+        '<button type="button" class="btn" data-xprep-edit="1">' + (ui.xpEdit ? t('Done editing', 'Listo') : t('Edit menu', 'Editar men\u00fa')) + '</button></div>' : '') + '</section>';
+  }
+  function xpPatch(p) { S.xprep = S.xprep || {}; save('prepextra/board', p); render(); }
   function xpAdd() {
-    var n = document.getElementById('xprep-name'), q = document.getElementById('xprep-qty');
-    var name = ((n && n.value) || '').trim(); if (!name) { if (n) n.focus(); return; }
-    var id = typeof newId === 'function' ? newId() : 'k' + Date.now().toString(36);
-    var item = { name: name, qty: ((q && q.value) || '').trim(), by: who() || 'BOH', at: Date.now() };
-    var items = Object.assign({}, (S.xprep && S.xprep.items) || {}); items[id] = item;
-    S.xprep = Object.assign({}, S.xprep, { items: items });
-    var p = {}; p[id] = item; save('prepextra/board', { items: p });
-    if (n) n.value = ''; if (q) q.value = '';
-    if (document.activeElement) document.activeElement.blur();
-    render();
+    var n = document.getElementById('xprep-name'), name = ((n && n.value) || '').trim(); if (!name) { if (n) n.focus(); return; }
+    var id = typeof newId === 'function' ? newId() : 'k' + Date.now().toString(36), d = xpDay();
+    var item = { name: name, by: who() || 'BOH', at: Date.now() };
+    S.xprep.items = Object.assign({}, S.xprep.items); S.xprep.items[id] = item;
+    S.xprep.days = Object.assign({}, S.xprep.days); S.xprep.days[d] = Object.assign({}, S.xprep.days[d]); S.xprep.days[d][id] = true;
+    var p = { items: {}, days: {} }; p.items[id] = item; p.days[d] = {}; p.days[d][id] = true;
+    if (n) n.value = ''; if (document.activeElement) document.activeElement.blur();
+    xpPatch(p);
+  }
+  function xpSetDay(id, on) {
+    var d = xpDay();
+    S.xprep.days = Object.assign({}, S.xprep.days); S.xprep.days[d] = Object.assign({}, S.xprep.days[d]); S.xprep.days[d][id] = on;
+    var p = { days: {} }; p.days[d] = {}; p.days[d][id] = on; xpPatch(p);
   }
   function xpDel(id) {
-    var items = Object.assign({}, (S.xprep && S.xprep.items) || {}); delete items[id];
-    S.xprep = Object.assign({}, S.xprep, { items: items });
-    var p = {}; p[id] = null; save('prepextra/board', { items: p });
-    render();
+    S.xprep.items = Object.assign({}, S.xprep.items); delete S.xprep.items[id];
+    var p = { items: {} }; p.items[id] = null; xpPatch(p);
   }
   function xpTick(id, on) {
-    var d = ui.prepDate || iso(new Date());
-    var items = Object.assign({}, (S.xprep && S.xprep.items) || {});
+    var d = xpDay(), items = Object.assign({}, S.xprep.items);
     if (items[id]) { items[id] = Object.assign({}, items[id], { done: Object.assign({}, items[id].done || {}) }); items[id].done[d] = on; }
-    S.xprep = Object.assign({}, S.xprep, { items: items });
-    var p = {}; p[id] = { done: {} }; p[id].done[d] = on; save('prepextra/board', { items: p });
+    S.xprep.items = items;
+    var p = { items: {} }; p.items[id] = { done: {} }; p.items[id].done[d] = on; save('prepextra/board', p);
   }
   function xpPlace() {
-    if (ui.tab !== 'prep' || document.querySelector('.x-prep')) return;
+    if (ui.tab !== 'prep') return;
     var view = document.getElementById('view'); if (!view) return;
-    var bar = view.querySelector('.bar');
-    if (bar) bar.insertAdjacentHTML('afterend', xpCard()); else view.insertAdjacentHTML('afterbegin', xpCard());
+    if (!document.querySelector('.x-prep')) { var top = xpCard(); if (top) { var bar = view.querySelector('.bar'); if (bar) bar.insertAdjacentHTML('afterend', top); else view.insertAdjacentHTML('afterbegin', top); } }
+    if (!document.querySelector('.x-prep-menu')) view.insertAdjacentHTML('beforeend', xpMenu());
     if (typeof translateDom === 'function') translateDom();
   }
 
@@ -199,10 +218,13 @@
       if (S.shift) { S.shift.by = Object.assign({}, S.shift.by || {}, by); }
     }, true);
     document.addEventListener('click', function (e) {
-      var b = e.target.closest && e.target.closest('[data-x86],[data-xwho],[data-xprep-add],[data-xprep-del]'); if (!b) return;
+      var b = e.target.closest && e.target.closest('[data-x86],[data-xwho],[data-xprep-add],[data-xprep-del],[data-xprep-on],[data-xprep-off],[data-xprep-edit]'); if (!b) return;
       e.preventDefault(); e.stopImmediatePropagation();
       if (b.dataset.xprepAdd) { xpAdd(); return; }
       if (b.dataset.xprepDel) { xpDel(b.dataset.xprepDel); return; }
+      if (b.dataset.xprepOn) { xpSetDay(b.dataset.xprepOn, true); return; }
+      if (b.dataset.xprepOff) { xpSetDay(b.dataset.xprepOff, false); return; }
+      if (b.dataset.xprepEdit) { ui.xpEdit = !ui.xpEdit; render(); return; }
       if (b.dataset.x86 === 'add') add(); else if (b.dataset.x86 === 'back') back(b.dataset.id);
       else if (b.dataset.xwho === 'pick') setWho(b.dataset.name);
       else if (b.dataset.xwho === 'out') setWho('');
@@ -212,7 +234,7 @@
       if (e.key !== 'Enter' || !e.target) return;
       if (e.target.id === 'x86-name' || e.target.id === 'x86-note') { e.preventDefault(); add(); }
       if (e.target.id === 'xwho-txt') { e.preventDefault(); setWho(e.target.value); }
-      if (e.target.id === 'xprep-name' || e.target.id === 'xprep-qty') { e.preventDefault(); xpAdd(); }
+      if (e.target.id === 'xprep-name') { e.preventDefault(); xpAdd(); }
     });
     render();
   }
