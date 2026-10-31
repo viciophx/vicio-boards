@@ -34,18 +34,37 @@
     return a;
   }
 
-  var asking = false;
+  /* PIN screen drawn on the page. The browser's own prompt box is unreliable on iPads running the board from the Home Screen,
+     and it never says when a PIN is wrong. Everyone waiting on the PIN shares one screen; it closes when a PIN is entered. */
+  var asking = null;
   function askPin() {
-    if (asking) return false; asking = true;
-    var v = window.prompt('Enter the Vicio team PIN\nIngresa el PIN del equipo Vicio');
-    asking = false;
-    if (v == null) return false;
-    setPin(String(v).trim()); return true;
+    if (asking) return asking;
+    asking = new Promise(function (resolve) {
+      var tried = !!pin();
+      var wrap = document.createElement('div');
+      wrap.id = 'vicio-pin';
+      wrap.setAttribute('style', 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(24,24,27,.72);font:16px/1.45 system-ui,-apple-system,sans-serif;color:#18181B');
+      wrap.innerHTML = '<form style="width:min(100%,360px);background:#fff;border-top:8px solid #8B1E1E;border-radius:12px;padding:24px;box-shadow:0 12px 40px rgba(0,0,0,.3)">' +
+        '<h2 style="margin:0 0 4px;font-size:22px">Team PIN</h2><p style="margin:0 0 14px;color:#5E5E66">Ask a manager for it. This device remembers it.<br>P\u00eddelo a un gerente. Este aparato lo recuerda.</p>' +
+        '<input id="vicio-pin-in" type="tel" inputmode="numeric" autocomplete="one-time-code" placeholder="PIN" aria-label="Team PIN" style="width:100%;box-sizing:border-box;font-size:28px;letter-spacing:.2em;text-align:center;padding:12px;border:2px solid #E4E2DF;border-radius:10px;color:#18181B;background:#fff">' +
+        '<p id="vicio-pin-err" style="min-height:1.4em;margin:8px 0 10px;color:#8B1E1E;font-weight:600">' + (tried ? 'That PIN didn\u2019t work. Try again. \u00b7 Ese PIN no funcion\u00f3. Int\u00e9ntalo de nuevo.' : '') + '</p>' +
+        '<button type="submit" style="width:100%;font:600 17px system-ui,-apple-system,sans-serif;background:#8B1E1E;color:#fff;border:0;border-radius:10px;padding:14px;cursor:pointer">Enter \u00b7 Entrar</button></form>';
+      (document.body || document.documentElement).appendChild(wrap);
+      var inp = wrap.querySelector('#vicio-pin-in'), err = wrap.querySelector('#vicio-pin-err');
+      setTimeout(function () { try { inp.focus(); } catch (e) {} }, 50);
+      wrap.querySelector('form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var v = String(inp.value || '').trim();
+        if (!v) { err.textContent = 'Type the PIN first. \u00b7 Escribe el PIN primero.'; inp.focus(); return; }
+        setPin(v); wrap.remove(); asking = null; resolve(true);
+      });
+    });
+    return asking;
   }
   async function getJson(qs) {
     var r = await fetch(API + (API.indexOf('?') < 0 ? '?' : '&') + qs + '&pin=' + encodeURIComponent(pin()) + '&t=' + Date.now());
     var j = await r.json();
-    if (!j.ok && j.error === 'pin') { if (askPin()) return getJson(qs); }
+    if (!j.ok && j.error === 'pin') { if (await askPin()) return getJson(qs); }
     if (!j.ok) { var e = new Error(j.error || 'failed'); e.code = j.error === 'pin' ? 'not_granted' : 'unavailable'; throw e; }
     if (j.role) role = j.role;
     return j;
@@ -54,7 +73,7 @@
     body.pin = pin();
     var r = await fetch(API, { method: 'POST', body: JSON.stringify(body) });
     var j = await r.json();
-    if (!j.ok && j.error === 'pin') { if (askPin()) return postJson(body); }
+    if (!j.ok && j.error === 'pin') { if (await askPin()) return postJson(body); }
     if (!j.ok) { var e = new Error(j.error || 'failed'); e.code = j.error === 'pin' ? 'not_granted' : 'unavailable'; throw e; }
     if (j.role) role = j.role;
     return j;
