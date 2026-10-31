@@ -206,6 +206,13 @@
   function start() {
     if (!ready()) return setTimeout(start, 200);
     addRecipes();
+    /* Price List lives with the Admin pages (managers only), not under Inventory. */
+    if (typeof GROUPS !== 'undefined') {
+      GROUPS.forEach(function (g) { var i = g[1].indexOf('prices'); if (i >= 0 && g[0] !== 'Admin') g[1].splice(i, 1); });
+      var ag = GROUPS.find(function (g) { return g[0] === 'Admin'; });
+      if (ag && ag[1].indexOf('prices') < 0) ag[1].push('prices');
+      if (ui.tab === 'prices' && !xpEd()) ui.tab = 'today';
+    }
     var st = document.createElement('style');
     st.textContent = '.x-by{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font:600 11px var(--f-body,system-ui)}.x-signin .chips .btn{min-height:44px;font-size:16px}';
     document.head.appendChild(st);
