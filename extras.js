@@ -18,7 +18,8 @@
     'Allow Google Drive for this page to read the schedule sheet.': 'Permite Google Drive en esta página para leer la hoja de turnos.',
     'Connect Google Drive in Settings, Connectors, to read the schedule sheet.': 'Conecta Google Drive en Ajustes, Conectores, para leer la hoja de turnos.',
     'Could not read the schedule sheet.': 'No se pudo leer la hoja de turnos.', 'The sheet came back empty.': 'La hoja llegó vacía.',
-    'Shift mode': 'Modo turno', 'Exit shift mode': 'Salir del modo turno'
+    'Shift mode': 'Modo turno', 'Exit shift mode': 'Salir del modo turno', 'Meatballs': 'Albóndigas',
+    'Build, bottom layer first': 'Armado, de abajo hacia arriba', 'Ingredients': 'Ingredientes', 'Portions and spec': 'Porciones y especificación', 'Procedure': 'Procedimiento', 'Critical rules': 'Reglas críticas', 'Allergens': 'Alérgenos', 'Notes': 'Notas', 'Mods': 'Modificaciones', 'Food cost': 'Costo de alimentos'
   };
   if (typeof ES === 'object' && ES) Object.keys(ES_MORE).forEach(function (k) { if (ES[k] == null) ES[k] = ES_MORE[k]; });
   if (BOARD !== 'kitchen') return;
@@ -29,6 +30,23 @@
   function t(en, esx) { return es() ? esx : en; }
   function who() { return (ui.by || '').trim(); }
   function setWho(n) { ui.by = (n || '').trim(); try { if (ui.by) localStorage.setItem('vicio_by', ui.by); else localStorage.removeItem('vicio_by'); } catch (e) {} render(); }
+
+
+  /* Recipe cards from recipes.js go into their group on the Recipes page; esx holds the Spanish card. */
+  function addRecipes() {
+    if (typeof BOOK === 'undefined' || !Array.isArray(BOOK)) return;
+    (window.VICIO_RECIPES || []).forEach(function (pair) {
+      var g = BOOK.find(function (x) { return x.name === pair[0]; }) || BOOK[0];
+      if (!BOOK.some(function (x) { return x.items.some(function (i) { return i.id === pair[1].id; }); })) g.items.push(pair[1]);
+    });
+    if (typeof recDetail === 'function' && !recDetail.__esx) {
+      var rd0 = recDetail;
+      recDetail = function (x) { return rd0(x && x.esx && es() ? Object.assign({}, x, x.esx) : x); };
+      recDetail.__esx = true;
+    }
+    if (typeof render === 'function' && ui.tab === 'recipes') render();
+  }
+  window.__vicioAddRecipes = addRecipes;
 
   /* Sign in: pick a name from the roster, kitchen first, or type one. Kept on this device until "Not me". */
   function signin() {
@@ -96,6 +114,7 @@
 
   function start() {
     if (!ready()) return setTimeout(start, 200);
+    addRecipes();
     var st = document.createElement('style');
     st.textContent = '.x-by{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font:600 11px var(--f-body,system-ui)}.x-signin .chips .btn{min-height:44px;font-size:16px}';
     document.head.appendChild(st);
