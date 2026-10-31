@@ -19,7 +19,7 @@
     'Connect Google Drive in Settings, Connectors, to read the schedule sheet.': 'Conecta Google Drive en Ajustes, Conectores, para leer la hoja de turnos.',
     'Could not read the schedule sheet.': 'No se pudo leer la hoja de turnos.', 'The sheet came back empty.': 'La hoja llegó vacía.',
     'Shift mode': 'Modo turno', 'Exit shift mode': 'Salir del modo turno', 'Meatballs': 'Albóndigas',
-    'Build, bottom layer first': 'Armado, de abajo hacia arriba', 'Ingredients': 'Ingredientes', 'Portions and spec': 'Porciones y especificación', 'Procedure': 'Procedimiento', 'Critical rules': 'Reglas críticas', 'Allergens': 'Alérgenos', 'Notes': 'Notas', 'Mods': 'Modificaciones', 'Food cost': 'Costo de alimentos', 'Extra prep': 'Prep extra', 'Recipe': 'Receta'
+    'Build, bottom layer first': 'Armado, de abajo hacia arriba', 'Ingredients': 'Ingredientes', 'Portions and spec': 'Porciones y especificación', 'Procedure': 'Procedimiento', 'Critical rules': 'Reglas críticas', 'Allergens': 'Alérgenos', 'Notes': 'Notas', 'Mods': 'Modificaciones', 'Food cost': 'Costo de alimentos', 'Extra prep': 'Prep extra', 'Recipe': 'Receta', 'Scrub floor drains': 'Talla las coladeras'
   };
   if (typeof ES === 'object' && ES) Object.keys(ES_MORE).forEach(function (k) { if (ES[k] == null) ES[k] = ES_MORE[k]; });
   /* Schedule: the Shifts tab also carries Céntrico shifts. These boards show only Vicio shifts (location Vicio, or Vicio in the role). */
@@ -347,6 +347,8 @@
   function start() {
     if (!ready()) return setTimeout(start, 200);
     addRecipes();
+    /* Task wording fixes. Ids stay the same, so past checks still count. No floor mats in the kitchen. */
+    if (typeof CLEANING !== 'undefined') CLEANING.forEach(function (day) { (day[3] || []).forEach(function (it) { if (it[1] === 'c_drains') it[2] = 'Scrub floor drains'; }); });
     /* Price List lives with the Admin pages (managers only), not under Inventory. */
     if (typeof GROUPS !== 'undefined') {
       GROUPS.forEach(function (g) { var i = g[1].indexOf('prices'); if (i >= 0 && g[0] !== 'Admin') g[1].splice(i, 1); });
