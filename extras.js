@@ -162,13 +162,14 @@
   window.__vicioAddRecipes = addRecipes;
   /* Food photo on each recipe page, between Notes and Food cost. Stored per recipe at rphotos/<id> (the same record the
      training recipe cards use), shrunk to about 1000 px. Managers add, replace or remove it; everyone sees it. */
-  var photoLoading = {};
+  var photoLoading = {}, photoChecked = {};
   function withPhoto(x, html) {
     if (!x || !x.id || typeof PHOTO === 'undefined') return html;
     var id = x.id, img = PHOTO[id], ed = typeof isEditor === 'function' ? isEditor() : false;
-    if (img === undefined && !photoLoading[id] && typeof getDoc === 'function') {
-      photoLoading[id] = 1;
-      getDoc('rphotos/' + id).then(function (d) { PHOTO[id] = (d && d.img) || null; photoLoading[id] = 0; render(); }, function () { photoLoading[id] = 0; });
+    /* Look again every 20 seconds while a recipe has no photo, so one saved from another device shows up without a reload. */
+    if (!img && !photoLoading[id] && typeof getDoc === 'function' && Date.now() - (photoChecked[id] || 0) > 20000) {
+      photoLoading[id] = 1; photoChecked[id] = Date.now();
+      getDoc('rphotos/' + id).then(function (d) { var v = (d && d.img) || null, changed = v !== PHOTO[id]; PHOTO[id] = v; photoLoading[id] = 0; if (changed) render(); }, function () { photoLoading[id] = 0; });
     }
     if (!img && !ed) return html;
     var block = '<div class="rsec x-photo"><p class="grp">' + t('Photo', 'Foto') + '</p>' +
