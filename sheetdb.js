@@ -35,6 +35,9 @@
   function mapPath(p) { p = String(p); return SHARED.indexOf(p.split('/')[0]) >= 0 ? p : PREFIX + p; }
 
   var cache = {};          // full path -> data object
+  /* Taps still saving, per path, and the sheet's time on each path's last save from this device. While a path is saving,
+     neither an older poll nor an earlier save's reply may overwrite what the screen shows. */
+  var pending = {}, ackAt = {};
   var since = 0, timer = null, busy = false, started = false;
   var docSubs = [], colSubs = [], shiftSubs = [];
   var lastShifts = '';
@@ -110,6 +113,7 @@
       var j = await getJson('since=' + since);
       var changed = {};
       (j.docs || []).forEach(function (d) {
+        if (pending[d.path] || (ackAt[d.path] && d.updated < ackAt[d.path])) return;
         if (d.deleted) delete cache[d.path]; else cache[d.path] = d.data || {};
         changed[d.path] = 1;
       });
@@ -175,12 +179,16 @@
     if (op === 'delete') delete cache[path];
     else cache[path] = op === 'set' ? clone(data || {}) : deep(clone(before) || {}, clone(data || {}));
     var ch = {}; ch[path] = 1; notify(ch);
+    pending[path] = (pending[path] || 0) + 1;
     try {
       var j = await postJson({ op: op, path: path, data: data });
-      if (op !== 'delete' && j.data) { cache[path] = j.data; notify(ch); }
+      pending[path]--;
+      if (j.updated) ackAt[path] = Math.max(ackAt[path] || 0, j.updated);
+      if (!pending[path] && op !== 'delete' && j.data) { cache[path] = j.data; notify(ch); }
     } catch (e) {
-      if (before === undefined) delete cache[path]; else cache[path] = before;
-      notify(ch); throw e;
+      pending[path]--;
+      if (!pending[path]) { if (before === undefined) delete cache[path]; else cache[path] = before; notify(ch); }
+      throw e;
     }
   }
 
