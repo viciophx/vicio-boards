@@ -35,6 +35,23 @@
     sheetShifts.__vicio = true;
     if (S.sheetCsv) { S.sheet = sheetShifts(S.sheetCsv); mergeShifts(); render(); }
   })();
+  /* Once someone is signed in, the sign-in card goes away and their name sits in the header of every checklist card
+     instead. Tapping the name signs them out so the next person can pick theirs. */
+  function nameChips(name, attr, label) {
+    document.querySelectorAll('section.card,details.card').forEach(function (sec) {
+      if (sec.classList.contains('x-signin') || !sec.querySelector('input[data-chk],input[data-pdone],input[data-xprep]')) return;
+      var old = sec.querySelector('.x-who');
+      if (!name) { if (old) old.remove(); return; }
+      if (old) { if (old.dataset.n === name) return; old.remove(); }
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'x-who'; b.setAttribute(attr, 'out'); b.dataset.n = name;
+      b.title = label; b.setAttribute('aria-label', name + '. ' + label);
+      b.textContent = name;
+      var head = sec.querySelector('.cardhead');
+      /* Inside a fold's header the name must not open or close the fold when tapped. */
+      if (head) { head.insertBefore(b, head.querySelector('.count') || null); } else sec.insertBefore(b, sec.firstChild);
+    });
+  }
+  var WHO_CSS = '.x-who{margin-left:auto;font:600 12px var(--f-body,system-ui);color:var(--cherry,#8B1E1E);background:var(--cherry-soft,rgba(139,30,30,.1));border:1px solid currentColor;border-radius:999px;padding:4px 10px;min-height:28px;cursor:pointer;white-space:nowrap}.x-who::before{content:"\u25CF ";font-size:9px;vertical-align:1px}.cardhead{flex-wrap:wrap;gap:6px}';
   /* FOH: who is on this device, and their initials on everything they tick. The FOH board already saves the name with each
      tick and clears the sign-in at the next shift; this puts the sign-in on Today and Checklists and shows initials. */
   if (BOARD === 'foh') {
@@ -51,8 +68,7 @@
       }
       function card() {
         var nm = whoName();
-        if (nm) return '<section class="card x-signin"><div class="cardhead"><h3>' + ft('On this device', 'En este aparato') + '</h3><span class="count"><b>' + esc(nm) + '</b></span></div>' +
-          '<div class="padd"><button type="button" class="btn x" data-fwho="out">' + ft('Not me', 'No soy yo') + '</button></div></section>';
+        if (nm) return '';
         var ppl = typeof stPeople === 'function' ? stPeople() : [];
         ppl = ppl.filter(function (p) { return p.group !== 'Kitchen'; }).concat(ppl.filter(function (p) { return p.group === 'Kitchen'; }));
         return '<section class="card edge x-signin"><div class="cardhead"><h3>' + ft('Who is on tonight?', '\u00bfQui\u00e9n est\u00e1 esta noche?') + '</h3></div>' +
@@ -78,11 +94,11 @@
         });
       }
       var st = document.createElement('style');
-      st.textContent = '.x-by{display:inline-block;margin-left:8px;padding:1px 7px;letter-spacing:.04em;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font:600 11px var(--f-body,system-ui)}.byline{display:none!important}.x-signin .chips .btn{min-height:44px;font-size:16px}';
+      st.textContent = '.x-by{display:inline-block;margin-left:8px;padding:1px 7px;letter-spacing:.04em;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font:600 11px var(--f-body,system-ui)}.byline{display:none!important}.x-signin .chips .btn{min-height:44px;font-size:16px}' + WHO_CSS;
       document.head.appendChild(st);
       ['today', 'lists'].forEach(function (k) { var v = VIEWS[k]; if (typeof v === 'function') VIEWS[k] = function () { return card() + v.apply(this, arguments); }; });
       var r0 = render;
-      render = function () { r0.apply(this, arguments); try { annotate(); } catch (e) {} };
+      render = function () { r0.apply(this, arguments); try { annotate(); nameChips(whoName(), 'data-fwho', ft('Not you? Tap to switch', '\u00bfNo eres t\u00fa? Toca para cambiar')); } catch (e) {} };
       /* A tap and the name go out together, at once, so a box never flips back while it saves. */
       document.addEventListener('change', function (e) {
         var inp = e.target; if (!inp || !inp.dataset || !inp.dataset.chk) return;
@@ -224,8 +240,7 @@
 
   /* Sign in: pick a name from the roster, kitchen first, or type one. Kept on this device until "Not me". */
   function signin() {
-    if (who()) return '<section class="card x-signin"><div class="cardhead"><h3>On this phone</h3><span class="count"><b>' + esc(who()) + '</b></span></div>' +
-      '<div class="padd"><button type="button" class="btn x" data-xwho="out">Not me</button></div></section>';
+    if (who()) return '';
     var ppl = typeof stPeople === 'function' ? stPeople() : [];
     ppl = ppl.filter(function (p) { return p.group === 'Kitchen'; }).concat(ppl.filter(function (p) { return p.group !== 'Kitchen'; }));
     return '<section class="card edge x-signin"><div class="cardhead"><h3>Who is checking tonight?</h3></div>' +
@@ -324,13 +339,13 @@
       if (ui.tab === 'todo') ui.tab = 'today';
     }
     var st = document.createElement('style');
-    st.textContent = '.x-by{display:inline-block;margin-left:8px;padding:1px 7px;letter-spacing:.04em;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font:600 11px var(--f-body,system-ui)}.x-signin .chips .btn{min-height:44px;font-size:16px}';
+    st.textContent = '.x-by{display:inline-block;margin-left:8px;padding:1px 7px;letter-spacing:.04em;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font:600 11px var(--f-body,system-ui)}.x-signin .chips .btn{min-height:44px;font-size:16px}' + WHO_CSS;
     document.head.appendChild(st);
     S.e86 = S.e86 || {}; S.xprep = S.xprep || {};
     var today = VIEWS.today;
     VIEWS.today = function () { return signin() + card() + today(); };
     var r0 = render;
-    render = function () { r0.apply(this, arguments); try { xpPlace(); annotate(); } catch (e) {} };
+    render = function () { r0.apply(this, arguments); try { xpPlace(); annotate(); nameChips(who(), 'data-xwho', t('Not you? Tap to switch', '\u00bfNo eres t\u00fa? Toca para cambiar')); } catch (e) {} };
     (function watch() {
       if (typeof db === 'undefined' || !db) return setTimeout(watch, 300);
       watchDoc('e86/board', function (d) { S.e86 = d || {}; render(); });
