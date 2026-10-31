@@ -263,15 +263,35 @@
       return '<li style="display:flex;align-items:center;gap:10px;padding:8px 0"><span style="flex:1;min-width:0"><b>' + esc(x.name) + '</b>' +
         (x.note ? ' <span class="muted">' + esc(x.note) + '</span>' : '') +
         '<small style="display:block;color:var(--muted)">' + esc([x.by, when].filter(Boolean).join(', ')) + '</small></span>' +
-        '<button type="button" class="btn x" data-x86="back" data-id="' + esc(x.id) + '">Back in</button></li>';
+        '<button type="button" class="btn x" data-x86="back" data-id="' + esc(x.id) + '">' + t('Back in', 'Ya hay') + '</button></li>';
     }).join('');
-    return '<section class="card' + (out.length ? ' edge' : '') + '"><div class="cardhead"><h3>86 board</h3><span class="count">' +
+    return '<section class="card' + (out.length ? ' edge' : '') + '"><div class="cardhead"><h3>' + t('86 board', 'Pizarra de 86') + '</h3><span class="count">' +
       (out.length ? out.length + ' ' + t('out', 'agotados') : t('Nothing out', 'Nada agotado')) + '</span></div>' +
-      (out.length ? '<ul class="checks plist">' + rows + '</ul>' : '<p class="status">When the kitchen or the bar runs out of something, put it here. The FOH board and Colette see it right away.</p>') +
+      (out.length ? '<ul class="checks plist">' + rows + '</ul>' : '<p class="status">' + t('When the kitchen or the bar runs out of something, put it here. The FOH board and Colette see it right away.', 'Cuando a la cocina o a la barra se le acabe algo, an\u00f3talo aqu\u00ed. La pizarra de FOH y Colette lo ven al instante.') + '</p>') +
       '<div class="padd"><input type="text" id="x86-name" placeholder="' + t('What\u2019s out', 'Qué se acabó') + '" autocomplete="off" autocorrect="off">' +
       '<input type="text" id="x86-note" placeholder="' + t('Until when, or why', 'Hasta cuándo, o por qué') + '" autocomplete="off" style="flex:1 1 120px;width:auto">' +
-      '<button type="button" class="btn primary" data-x86="add">86 it</button></div></section>';
+      '<button type="button" class="btn primary" data-x86="add">' + t('86 it', 'Ponerlo en 86') + '</button></div></section>';
   }
+  /* The 86 board lives behind a small button at the top right of Today; tapping it opens the list in a panel. */
+  function x86Btn() {
+    var n = list().length;
+    return '<button type="button" class="x86-btn' + (n ? ' on' : '') + '" data-x86="open" aria-label="' + t('86 board', 'Pizarra de 86') + ', ' + n + ' ' + t('out', 'agotados') + '">86' + (n ? '<b>' + n + '</b>' : '') + '</button>';
+  }
+  function x86Place() {
+    var head = document.getElementById('head'), old = document.querySelector('.x86-btn');
+    if (ui.tab !== 'today') { if (old) old.remove(); }
+    else if (head) { head.style.position = 'relative'; if (old) old.outerHTML = x86Btn(); else head.insertAdjacentHTML('beforeend', x86Btn()); }
+    var m = document.getElementById('x86-modal'), a = document.activeElement;
+    if (m && !(a && m.contains(a) && /^(INPUT|TEXTAREA)$/.test(a.tagName))) m.querySelector('.x86-body').innerHTML = card();
+  }
+  function x86Open() {
+    if (document.getElementById('x86-modal')) return;
+    var m = document.createElement('div'); m.id = 'x86-modal';
+    m.innerHTML = '<div class="x86-panel" role="dialog" aria-modal="true" aria-label="' + t('86 board', 'Pizarra de 86') + '"><button type="button" class="x86-x" data-x86="close" aria-label="' + t('Close', 'Cerrar') + '">\u00d7</button><div class="x86-body">' + card() + '</div></div>';
+    m.addEventListener('click', function (e) { if (e.target === m) x86Close(); });
+    document.body.appendChild(m);
+  }
+  function x86Close() { var m = document.getElementById('x86-modal'); if (m) m.remove(); }
   function add() {
     var n = document.getElementById('x86-name'), tn = document.getElementById('x86-note');
     var name = ((n && n.value) || '').trim(); if (!name) { if (n) n.focus(); return; }
@@ -339,13 +359,19 @@
       if (ui.tab === 'todo') ui.tab = 'today';
     }
     var st = document.createElement('style');
-    st.textContent = '.x-by{display:inline-block;margin-left:8px;padding:1px 7px;letter-spacing:.04em;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font:600 11px var(--f-body,system-ui)}.x-signin .chips .btn{min-height:44px;font-size:16px}' + WHO_CSS;
+    st.textContent = '.x-by{display:inline-block;margin-left:8px;padding:1px 7px;letter-spacing:.04em;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font:600 11px var(--f-body,system-ui)}.x-signin .chips .btn{min-height:44px;font-size:16px}' + WHO_CSS +
+      '.x86-btn{position:absolute;top:0;right:0;display:inline-flex;align-items:center;gap:6px;font:700 15px var(--f-head,var(--f-body,system-ui));letter-spacing:.02em;min-height:40px;padding:6px 14px;border-radius:999px;border:1px solid var(--line,#ccc);background:var(--surface,#fff);color:var(--ink,#18181B);cursor:pointer}' +
+      '.x86-btn b{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--cherry,#8B1E1E);color:var(--cherry-ink,#fff);font-size:12px}' +
+      '.x86-btn.on{border-color:var(--cherry,#8B1E1E);color:var(--cherry,#8B1E1E)}#head h1{padding-right:84px}' +
+      '#x86-modal{position:fixed;inset:0;z-index:9000;display:flex;align-items:flex-start;justify-content:center;padding:max(60px,env(safe-area-inset-top,0px)) 16px 16px;background:rgba(24,24,27,.55)}' +
+      '.x86-panel{position:relative;width:min(100%,520px);max-height:calc(100vh - 90px);overflow:auto;border-radius:14px}.x86-panel .card{margin:0}' +
+      '.x86-x{position:absolute;top:10px;right:10px;z-index:1;width:36px;height:36px;border-radius:999px;border:1px solid var(--line,#ccc);background:var(--surface,#fff);color:var(--ink,#18181B);font-size:20px;line-height:1;cursor:pointer}.x86-panel .cardhead{padding-right:44px}';
     document.head.appendChild(st);
     S.e86 = S.e86 || {}; S.xprep = S.xprep || {};
     var today = VIEWS.today;
-    VIEWS.today = function () { return signin() + card() + today(); };
+    VIEWS.today = function () { return signin() + today(); };
     var r0 = render;
-    render = function () { r0.apply(this, arguments); try { xpPlace(); annotate(); nameChips(who(), 'data-xwho', t('Not you? Tap to switch', '\u00bfNo eres t\u00fa? Toca para cambiar')); } catch (e) {} };
+    render = function () { r0.apply(this, arguments); try { xpPlace(); x86Place(); annotate(); nameChips(who(), 'data-xwho', t('Not you? Tap to switch', '\u00bfNo eres t\u00fa? Toca para cambiar')); } catch (e) {} };
     (function watch() {
       if (typeof db === 'undefined' || !db) return setTimeout(watch, 300);
       watchDoc('e86/board', function (d) { S.e86 = d || {}; render(); });
@@ -384,12 +410,15 @@
       if (b.dataset.xprepOn) { xpSetDay(b.dataset.xprepOn, true); return; }
       if (b.dataset.xprepOff) { xpSetDay(b.dataset.xprepOff, false); return; }
       if (b.dataset.xprepEdit) { ui.xpEdit = !ui.xpEdit; render(); return; }
+      if (b.dataset.x86 === 'open') { x86Open(); return; }
+      if (b.dataset.x86 === 'close') { x86Close(); return; }
       if (b.dataset.x86 === 'add') add(); else if (b.dataset.x86 === 'back') back(b.dataset.id);
       else if (b.dataset.xwho === 'pick') setWho(b.dataset.name);
       else if (b.dataset.xwho === 'out') setWho('');
       else if (b.dataset.xwho === 'in') { var x = document.getElementById('xwho-txt'); if (!x || !x.value.trim()) { if (x) x.focus(); return; } setWho(x.value); }
     }, true);
     document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { x86Close(); return; }
       if (e.key !== 'Enter' || !e.target) return;
       if (e.target.id === 'x86-name' || e.target.id === 'x86-note') { e.preventDefault(); add(); }
       if (e.target.id === 'xwho-txt') { e.preventDefault(); setWho(e.target.value); }
