@@ -142,8 +142,12 @@
 
 
   /* Recipe cards from recipes.js go into their group on the Recipes page; esx holds the Spanish card. */
+  var REMOVED_RECIPES = ['nm505'];  /* Nuevo Mexico 505 */
   function addRecipes() {
     if (typeof BOOK === 'undefined' || !Array.isArray(BOOK)) return;
+    BOOK.forEach(function (g) { g.items = g.items.filter(function (i) { return REMOVED_RECIPES.indexOf(i.id) < 0; }); });
+    if (typeof RECIPES !== 'undefined' && Array.isArray(RECIPES)) RECIPES.forEach(function (g) { g[1] = g[1].filter(function (x) { return REMOVED_RECIPES.indexOf(x[0]) < 0; }); });
+    if (REMOVED_RECIPES.indexOf(ui.rSel) >= 0) ui.rSel = null;
     (window.VICIO_RECIPES || []).forEach(function (pair) {
       var g = BOOK.find(function (x) { return x.name === pair[0]; }) || BOOK[0];
       if (!BOOK.some(function (x) { return x.items.some(function (i) { return i.id === pair[1].id; }); })) g.items.push(pair[1]);
