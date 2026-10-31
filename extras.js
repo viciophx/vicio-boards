@@ -371,7 +371,9 @@
       '.x86-btn.on{border-color:var(--cherry,#8B1E1E);color:var(--cherry,#8B1E1E)}#head h1{padding-right:84px}' +
       '#x86-modal{position:fixed;inset:0;z-index:9000;display:flex;align-items:flex-start;justify-content:center;padding:max(60px,env(safe-area-inset-top,0px)) 16px 16px;background:rgba(24,24,27,.55)}' +
       '.x86-panel{position:relative;width:min(100%,520px);max-height:calc(100vh - 90px);overflow:auto;border-radius:14px}.x86-panel .card{margin:0}' +
-      '.x86-x{position:absolute;top:10px;right:10px;z-index:1;width:36px;height:36px;border-radius:999px;border:1px solid var(--line,#ccc);background:var(--surface,#fff);color:var(--ink,#18181B);font-size:20px;line-height:1;cursor:pointer}.x86-panel .cardhead{padding-right:44px}';
+      '.x86-x{position:absolute;top:10px;right:10px;z-index:1;width:36px;height:36px;border-radius:999px;border:1px solid var(--line,#ccc);background:var(--surface,#fff);color:var(--ink,#18181B);font-size:20px;line-height:1;cursor:pointer}.x86-panel .cardhead{padding-right:44px}' +
+      /* Side-by-side cards: a folded card shrinks to its title instead of stretching to its neighbour's height. */
+      '.grid>details.fold{align-self:start}';
     document.head.appendChild(st);
     S.e86 = S.e86 || {}; S.xprep = S.xprep || {};
     var today = VIEWS.today;
