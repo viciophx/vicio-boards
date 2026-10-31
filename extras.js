@@ -348,7 +348,11 @@
     if (!ready()) return setTimeout(start, 200);
     addRecipes();
     /* Task wording fixes. Ids stay the same, so past checks still count. No floor mats in the kitchen. */
-    if (typeof CLEANING !== 'undefined') CLEANING.forEach(function (day) { (day[3] || []).forEach(function (it) { if (it[1] === 'c_drains') it[2] = 'Scrub floor drains'; }); });
+    if (typeof CLEANING !== 'undefined') CLEANING.forEach(function (day) {
+      (day[3] || []).forEach(function (it) { if (it[1] === 'c_drains') it[2] = 'Scrub floor drains'; });
+      /* Tasks taken off the rotation: pizza pan buildup scrub. */
+      if (day[3]) day[3] = day[3].filter(function (it) { return ['c_pans'].indexOf(it[1]) < 0; });
+    });
     /* Price List lives with the Admin pages (managers only), not under Inventory. */
     if (typeof GROUPS !== 'undefined') {
       GROUPS.forEach(function (g) { var i = g[1].indexOf('prices'); if (i >= 0 && g[0] !== 'Admin') g[1].splice(i, 1); });
