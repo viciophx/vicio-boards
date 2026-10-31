@@ -212,6 +212,10 @@
       var ag = GROUPS.find(function (g) { return g[0] === 'Admin'; });
       if (ag && ag[1].indexOf('prices') < 0) ag[1].push('prices');
       if (ui.tab === 'prices' && !xpEd()) ui.tab = 'today';
+      /* To Do is not used on BOH: take it off the tabs (its saved items are left alone). */
+      GROUPS.forEach(function (g) { var i = g[1].indexOf('todo'); if (i >= 0) g[1].splice(i, 1); });
+      for (var gi = GROUPS.length - 1; gi >= 0; gi--) if (GROUPS[gi][0] !== 'Admin' && !GROUPS[gi][1].length) GROUPS.splice(gi, 1);
+      if (ui.tab === 'todo') ui.tab = 'today';
     }
     var st = document.createElement('style');
     st.textContent = '.x-by{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font:600 11px var(--f-body,system-ui)}.x-signin .chips .btn{min-height:44px;font-size:16px}';
