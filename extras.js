@@ -35,6 +35,79 @@
     sheetShifts.__vicio = true;
     if (S.sheetCsv) { S.sheet = sheetShifts(S.sheetCsv); mergeShifts(); render(); }
   })();
+  /* FOH: who is on this device, and their initials on everything they tick. The FOH board already saves the name with each
+     tick and clears the sign-in at the next shift; this puts the sign-in on Today and Checklists and shows initials. */
+  if (BOARD === 'foh') {
+    (function fohStart() {
+      if (typeof VIEWS === 'undefined' || typeof render !== 'function' || typeof save !== 'function' || typeof S === 'undefined' ||
+          typeof ui === 'undefined' || typeof window.setWho !== 'function' || typeof whoName !== 'function') return setTimeout(fohStart, 200);
+      var fes = function () { return ui.lang === 'es'; }, ft = function (a, b) { return fes() ? b : a; };
+      function ini(n) { var w = String(n || '').trim().split(/\s+/).filter(Boolean); if (!w.length) return ''; return (w.length === 1 ? w[0].slice(0, 2) : w[0][0] + w[w.length - 1][0]).toUpperCase(); }
+      function fquick(path, patch) {
+        if (typeof db === 'undefined' || !db || !db.doc) return save(path, patch);
+        if (typeof setStatus === 'function') setStatus('Saving');
+        return db.doc(path).update(patch).then(function () { if (typeof setStatus === 'function') setStatus('Saved', 'ok'); },
+          function () { if (typeof setStatus === 'function') setStatus('Not saved. Check your access and try again.', 'bad'); });
+      }
+      function card() {
+        var nm = whoName();
+        if (nm) return '<section class="card x-signin"><div class="cardhead"><h3>' + ft('On this device', 'En este aparato') + '</h3><span class="count"><b>' + esc(nm) + '</b></span></div>' +
+          '<div class="padd"><button type="button" class="btn x" data-fwho="out">' + ft('Not me', 'No soy yo') + '</button></div></section>';
+        var ppl = typeof stPeople === 'function' ? stPeople() : [];
+        ppl = ppl.filter(function (p) { return p.group !== 'Kitchen'; }).concat(ppl.filter(function (p) { return p.group === 'Kitchen'; }));
+        return '<section class="card edge x-signin"><div class="cardhead"><h3>' + ft('Who is on tonight?', '\u00bfQui\u00e9n est\u00e1 esta noche?') + '</h3></div>' +
+          '<p class="status">' + ft('Tap your name so your checks carry it. It clears at the next shift.', 'Toca tu nombre para que tus marcas lo lleven. Se borra en el siguiente turno.') + '</p>' +
+          '<div class="chips">' + ppl.map(function (p) { return '<button type="button" class="btn" data-fwho="pick" data-name="' + esc(p.name) + '">' + esc(first(p.name)) + '</button>'; }).join('') + '</div>' +
+          '<div class="padd"><input type="text" id="fwho-txt" placeholder="' + ft('Someone else', 'Otra persona') + '" autocomplete="off" autocapitalize="words">' +
+          '<button type="button" class="btn primary" data-fwho="in">' + ft('Sign in', 'Entrar') + '</button></div></section>';
+      }
+      var byDocs = {}, watched = {};
+      function byFor(path) {
+        if (S.shift && path === 'shifts/' + ui.date) return S.shift.by || {};
+        if (!watched[path] && typeof watchDoc === 'function' && typeof db !== 'undefined' && db) {
+          watched[path] = 1; watchDoc(path, function (d) { byDocs[path] = (d && d.by) || {}; annotate(); });
+        }
+        return byDocs[path] || {};
+      }
+      function annotate() {
+        document.querySelectorAll('input[data-chk]:checked').forEach(function (inp) {
+          var p = inp.dataset.chk.split('|'), name = byFor(p[0])[p[1]], lab = inp.closest('label');
+          if (!lab || !name || lab.querySelector('.x-by')) return;
+          var sm = document.createElement('small'); sm.className = 'x-by'; sm.textContent = ini(name); sm.title = name;
+          (lab.querySelector('span') || lab).appendChild(sm);
+        });
+      }
+      var st = document.createElement('style');
+      st.textContent = '.x-by{display:inline-block;margin-left:8px;padding:1px 7px;letter-spacing:.04em;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font:600 11px var(--f-body,system-ui)}.byline{display:none!important}.x-signin .chips .btn{min-height:44px;font-size:16px}';
+      document.head.appendChild(st);
+      ['today', 'lists'].forEach(function (k) { var v = VIEWS[k]; if (typeof v === 'function') VIEWS[k] = function () { return card() + v.apply(this, arguments); }; });
+      var r0 = render;
+      render = function () { r0.apply(this, arguments); try { annotate(); } catch (e) {} };
+      /* A tap and the name go out together, at once, so a box never flips back while it saves. */
+      document.addEventListener('change', function (e) {
+        var inp = e.target; if (!inp || !inp.dataset || !inp.dataset.chk) return;
+        e.stopImmediatePropagation();
+        var parts = inp.dataset.chk.split('|'), path = parts[0], id = parts[1], nm = whoName(), patch = { done: {} };
+        patch.done[id] = inp.checked;
+        if (nm || !inp.checked) { patch.by = {}; patch.by[id] = inp.checked ? nm : null; byDocs[path] = Object.assign({}, byDocs[path] || {}, patch.by); }
+        fquick(path, patch);
+        if (S.shift && path === 'shifts/' + ui.date && patch.by) S.shift.by = Object.assign({}, S.shift.by || {}, patch.by);
+        if (typeof markListDone === 'function') markListDone(path, id, inp.checked);
+        if (typeof maybeAutoReport === 'function') maybeAutoReport(path, id, inp.checked);
+        setTimeout(annotate, 0);
+      }, true);
+      document.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('[data-fwho]'); if (!b) return;
+        e.preventDefault(); e.stopImmediatePropagation();
+        if (b.dataset.fwho === 'pick') window.setWho(b.dataset.name);
+        else if (b.dataset.fwho === 'out') window.setWho('');
+        else { var x = document.getElementById('fwho-txt'); if (!x || !x.value.trim()) { if (x) x.focus(); return; } window.setWho(x.value.trim()); }
+      }, true);
+      document.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target && e.target.id === 'fwho-txt' && e.target.value.trim()) { e.preventDefault(); window.setWho(e.target.value.trim()); } });
+      render();
+    })();
+    return;
+  }
   if (BOARD !== 'kitchen') return;
   document.title = 'Vicio BOH';
 
