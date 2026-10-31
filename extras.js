@@ -22,6 +22,19 @@
     'Build, bottom layer first': 'Armado, de abajo hacia arriba', 'Ingredients': 'Ingredientes', 'Portions and spec': 'Porciones y especificación', 'Procedure': 'Procedimiento', 'Critical rules': 'Reglas críticas', 'Allergens': 'Alérgenos', 'Notes': 'Notas', 'Mods': 'Modificaciones', 'Food cost': 'Costo de alimentos', 'Extra prep': 'Prep extra', 'Recipe': 'Receta'
   };
   if (typeof ES === 'object' && ES) Object.keys(ES_MORE).forEach(function (k) { if (ES[k] == null) ES[k] = ES_MORE[k]; });
+  /* Schedule: the Shifts tab also carries Céntrico shifts. These boards show only Vicio shifts (location Vicio, or Vicio in the role). */
+  (function vicioOnly() {
+    if (typeof sheetShifts !== 'function' || typeof mergeShifts !== 'function' || typeof S === 'undefined' || typeof render !== 'function') return setTimeout(vicioOnly, 200);
+    if (sheetShifts.__vicio) return;
+    var ss0 = sheetShifts;
+    sheetShifts = function (csv) {
+      var all = ss0(csv), out = {};
+      Object.keys(all).forEach(function (id) { var x = all[id]; if (x && (x.org === 'Vicio' || /vicio/i.test(x.role || ''))) out[id] = x; });
+      return out;
+    };
+    sheetShifts.__vicio = true;
+    if (S.sheetCsv) { S.sheet = sheetShifts(S.sheetCsv); mergeShifts(); render(); }
+  })();
   if (BOARD !== 'kitchen') return;
   document.title = 'Vicio BOH';
 
