@@ -47,6 +47,8 @@
     if (typeof render === 'function' && ui.tab === 'recipes') render();
   }
   window.__vicioAddRecipes = addRecipes;
+  /* recipes.js lives beside this file on GitHub; on Colette's Board it is inlined, so the load is skipped there. */
+  if (!window.VICIO_RECIPES && !window.__vicioInline) { try { var rs = document.createElement('script'); rs.src = 'recipes.js?v=1'; document.head.appendChild(rs); } catch (e) {} }
 
   /* Sign in: pick a name from the roster, kitchen first, or type one. Kept on this device until "Not me". */
   function signin() {
