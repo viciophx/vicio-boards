@@ -154,12 +154,31 @@
     });
     if (typeof recDetail === 'function' && !recDetail.__esx) {
       var rd0 = recDetail;
-      recDetail = function (x) { return rd0(x && x.esx && es() ? Object.assign({}, x, x.esx) : x); };
+      recDetail = function (x) { return withPhoto(x, rd0(x && x.esx && es() ? Object.assign({}, x, x.esx) : x)); };
       recDetail.__esx = true;
     }
     if (typeof render === 'function' && ui.tab === 'recipes') render();
   }
   window.__vicioAddRecipes = addRecipes;
+  /* Food photo on each recipe page, between Notes and Food cost. Stored per recipe at rphotos/<id> (the same record the
+     training recipe cards use), shrunk to about 1000 px. Managers add, replace or remove it; everyone sees it. */
+  var photoLoading = {};
+  function withPhoto(x, html) {
+    if (!x || !x.id || typeof PHOTO === 'undefined') return html;
+    var id = x.id, img = PHOTO[id], ed = typeof isEditor === 'function' ? isEditor() : false;
+    if (img === undefined && !photoLoading[id] && typeof getDoc === 'function') {
+      photoLoading[id] = 1;
+      getDoc('rphotos/' + id).then(function (d) { PHOTO[id] = (d && d.img) || null; photoLoading[id] = 0; render(); }, function () { photoLoading[id] = 0; });
+    }
+    if (!img && !ed) return html;
+    var block = '<div class="rsec x-photo"><p class="grp">' + t('Photo', 'Foto') + '</p>' +
+      (img ? '<img src="' + img + '" alt="' + esc(x.name) + '" loading="lazy" style="display:block;width:100%;max-width:640px;border-radius:12px">' : '') +
+      (ed ? '<div class="chips" style="margin-top:10px"><label class="btn" style="cursor:pointer">' + (img ? t('Replace photo', 'Cambiar foto') : t('Add photo', 'Agregar foto')) +
+        '<input type="file" accept="image/*" data-photo="' + esc(id) + '" style="position:absolute;width:1px;height:1px;opacity:0"></label>' +
+        (img ? '<button type="button" class="btn x" data-act="phdel" data-id="' + esc(id) + '">' + t('Remove photo', 'Quitar foto') + '</button>' : '') + '</div>' : '') + '</div>';
+    var mark = '<div class="rsec"><p class="grp">Food cost</p>', i = html.indexOf(mark);
+    return i >= 0 ? html.slice(0, i) + block + html.slice(i) : html + block;
+  }
   /* recipes.js lives beside this file on GitHub; on Colette's Board it is inlined, so the load is skipped there. */
   if (!window.VICIO_RECIPES && !window.__vicioInline) { try { var rs = document.createElement('script'); rs.src = 'recipes.js?v=1'; document.head.appendChild(rs); } catch (e) {} }
 
