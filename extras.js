@@ -142,7 +142,7 @@
 
 
   /* Recipe cards from recipes.js go into their group on the Recipes page; esx holds the Spanish card. */
-  var REMOVED_RECIPES = ['nm505'];  /* Nuevo Mexico 505 */
+  var REMOVED_RECIPES = ['nm505', 'asadafries'];  /* Nuevo Mexico 505, Carne Asada Fries */
   function addRecipes() {
     if (typeof BOOK === 'undefined' || !Array.isArray(BOOK)) return;
     BOOK.forEach(function (g) { g.items = g.items.filter(function (i) { return REMOVED_RECIPES.indexOf(i.id) < 0; }); });
