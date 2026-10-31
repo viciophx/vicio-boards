@@ -19,7 +19,7 @@
     'Connect Google Drive in Settings, Connectors, to read the schedule sheet.': 'Conecta Google Drive en Ajustes, Conectores, para leer la hoja de turnos.',
     'Could not read the schedule sheet.': 'No se pudo leer la hoja de turnos.', 'The sheet came back empty.': 'La hoja llegó vacía.',
     'Shift mode': 'Modo turno', 'Exit shift mode': 'Salir del modo turno', 'Meatballs': 'Albóndigas',
-    'Build, bottom layer first': 'Armado, de abajo hacia arriba', 'Ingredients': 'Ingredientes', 'Portions and spec': 'Porciones y especificación', 'Procedure': 'Procedimiento', 'Critical rules': 'Reglas críticas', 'Allergens': 'Alérgenos', 'Notes': 'Notas', 'Mods': 'Modificaciones', 'Food cost': 'Costo de alimentos'
+    'Build, bottom layer first': 'Armado, de abajo hacia arriba', 'Ingredients': 'Ingredientes', 'Portions and spec': 'Porciones y especificación', 'Procedure': 'Procedimiento', 'Critical rules': 'Reglas críticas', 'Allergens': 'Alérgenos', 'Notes': 'Notas', 'Mods': 'Modificaciones', 'Food cost': 'Costo de alimentos', 'Extra prep': 'Prep extra'
   };
   if (typeof ES === 'object' && ES) Object.keys(ES_MORE).forEach(function (k) { if (ES[k] == null) ES[k] = ES_MORE[k]; });
   if (BOARD !== 'kitchen') return;
@@ -49,6 +49,63 @@
   window.__vicioAddRecipes = addRecipes;
   /* recipes.js lives beside this file on GitHub; on Colette's Board it is inlined, so the load is skipped there. */
   if (!window.VICIO_RECIPES && !window.__vicioInline) { try { var rs = document.createElement('script'); rs.src = 'recipes.js?v=1'; document.head.appendChild(rs); } catch (e) {} }
+
+  /* Extra prep: items a manager forces onto the Prep list regardless of the count. Standing until removed; ticked per day.
+     Stored at prepextra/board as {items:{id:{name, qty, by, at, done:{date:true}}}}, shared by every BOH phone and Colette. */
+  function xpItems() {
+    var it = (S.xprep && S.xprep.items) || {};
+    return Object.keys(it).map(function (id) { var x = it[id]; return x && x.name ? Object.assign({ id: id }, x) : null; })
+      .filter(Boolean).sort(function (a, b) { return (a.at || 0) - (b.at || 0); });
+  }
+  function xpCard() {
+    var d = ui.prepDate || (typeof iso === 'function' ? iso(new Date()) : ''), items = xpItems(), ed = typeof isEditor === 'function' ? isEditor() : true;
+    var nDone = items.filter(function (x) { return x.done && x.done[d]; }).length;
+    var rows = items.map(function (x) {
+      var rec = typeof BOOK !== 'undefined' ? BOOK.flatMap(function (g) { return g.items; }).find(function (r) { return r.name.toLowerCase() === x.name.toLowerCase(); }) : null;
+      return '<li><label><input type="checkbox" data-xprep="' + esc(x.id) + '"' + (x.done && x.done[d] ? ' checked' : '') + '><span><b>' + esc(x.name) + '</b></span></label>' +
+        '<span class="pneed">' + esc(x.qty ? x.qty : t('Extra', 'Extra')) + '</span>' +
+        (rec ? '<button type="button" class="btn x" data-act="recipe" data-id="' + esc(rec.id) + '">' + t('Recipe', 'Receta') + '</button>' : '') +
+        (ed ? '<button type="button" class="btn x" data-xprep-del="' + esc(x.id) + '" aria-label="Remove">\u00d7</button>' : '') + '</li>';
+    }).join('');
+    return '<section class="card edge x-prep"><div class="cardhead"><h3>Extra prep</h3><span class="count">' + (items.length ? nDone + ' ' + t('of', 'de') + ' ' + items.length : t('Nothing forced', 'Nada forzado')) + '</span></div>' +
+      '<p class="status">' + t('Always on the list, whatever the count says. A manager adds and removes; the crew ticks it off each day.', 'Siempre en la lista, diga lo que diga el conteo. Un gerente agrega y quita; el equipo lo marca cada d\u00eda.') + '</p>' +
+      (items.length ? '<ul class="checks plist">' + rows + '</ul>' : '') +
+      (ed ? '<div class="padd"><input type="text" id="xprep-name" placeholder="' + t('What to prep', 'Qu\u00e9 preparar') + '" autocomplete="off" autocapitalize="sentences">' +
+        '<input type="text" id="xprep-qty" placeholder="' + t('How much', 'Cu\u00e1nto') + '" autocomplete="off" style="width:120px">' +
+        '<button type="button" class="btn primary" data-xprep-add="1">' + t('Add', 'Agregar') + '</button></div>' : '') + '</section>';
+  }
+  function xpAdd() {
+    var n = document.getElementById('xprep-name'), q = document.getElementById('xprep-qty');
+    var name = ((n && n.value) || '').trim(); if (!name) { if (n) n.focus(); return; }
+    var id = typeof newId === 'function' ? newId() : 'k' + Date.now().toString(36);
+    var item = { name: name, qty: ((q && q.value) || '').trim(), by: who() || 'BOH', at: Date.now() };
+    var items = Object.assign({}, (S.xprep && S.xprep.items) || {}); items[id] = item;
+    S.xprep = Object.assign({}, S.xprep, { items: items });
+    var p = {}; p[id] = item; save('prepextra/board', { items: p });
+    if (n) n.value = ''; if (q) q.value = '';
+    if (document.activeElement) document.activeElement.blur();
+    render();
+  }
+  function xpDel(id) {
+    var items = Object.assign({}, (S.xprep && S.xprep.items) || {}); delete items[id];
+    S.xprep = Object.assign({}, S.xprep, { items: items });
+    var p = {}; p[id] = null; save('prepextra/board', { items: p });
+    render();
+  }
+  function xpTick(id, on) {
+    var d = ui.prepDate || iso(new Date());
+    var items = Object.assign({}, (S.xprep && S.xprep.items) || {});
+    if (items[id]) { items[id] = Object.assign({}, items[id], { done: Object.assign({}, items[id].done || {}) }); items[id].done[d] = on; }
+    S.xprep = Object.assign({}, S.xprep, { items: items });
+    var p = {}; p[id] = { done: {} }; p[id].done[d] = on; save('prepextra/board', { items: p });
+  }
+  function xpPlace() {
+    if (ui.tab !== 'prep' || document.querySelector('.x-prep')) return;
+    var view = document.getElementById('view'); if (!view) return;
+    var bar = view.querySelector('.bar');
+    if (bar) bar.insertAdjacentHTML('afterend', xpCard()); else view.insertAdjacentHTML('afterbegin', xpCard());
+    if (typeof translateDom === 'function') translateDom();
+  }
 
   /* Sign in: pick a name from the roster, kitchen first, or type one. Kept on this device until "Not me". */
   function signin() {
@@ -120,18 +177,21 @@
     var st = document.createElement('style');
     st.textContent = '.x-by{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font:600 11px var(--f-body,system-ui)}.x-signin .chips .btn{min-height:44px;font-size:16px}';
     document.head.appendChild(st);
-    S.e86 = S.e86 || {};
+    S.e86 = S.e86 || {}; S.xprep = S.xprep || {};
     var today = VIEWS.today;
     VIEWS.today = function () { return signin() + card() + today(); };
     var r0 = render;
-    render = function () { r0.apply(this, arguments); try { annotate(); } catch (e) {} };
+    render = function () { r0.apply(this, arguments); try { annotate(); xpPlace(); } catch (e) {} };
     (function watch() {
       if (typeof db === 'undefined' || !db) return setTimeout(watch, 300);
       watchDoc('e86/board', function (d) { S.e86 = d || {}; render(); });
+      watchDoc('prepextra/board', function (d) { S.xprep = d || {}; render(); });
     })();
     /* The name rides along with every shift check, next to the tracker's own done flag. */
     document.addEventListener('change', function (e) {
-      var inp = e.target; if (!inp || !inp.dataset || !inp.dataset.chk) return;
+      var inp = e.target; if (!inp || !inp.dataset) return;
+      if (inp.dataset.xprep) { e.stopImmediatePropagation(); xpTick(inp.dataset.xprep, inp.checked); return; }
+      if (!inp.dataset.chk) return;
       var parts = inp.dataset.chk.split('|'), path = parts[0], id = parts[1];
       if (path.indexOf('shifts/') !== 0) return;
       var nm = who(); if (!nm && inp.checked) return;
@@ -139,8 +199,10 @@
       if (S.shift) { S.shift.by = Object.assign({}, S.shift.by || {}, by); }
     }, true);
     document.addEventListener('click', function (e) {
-      var b = e.target.closest && e.target.closest('[data-x86],[data-xwho]'); if (!b) return;
+      var b = e.target.closest && e.target.closest('[data-x86],[data-xwho],[data-xprep-add],[data-xprep-del]'); if (!b) return;
       e.preventDefault(); e.stopImmediatePropagation();
+      if (b.dataset.xprepAdd) { xpAdd(); return; }
+      if (b.dataset.xprepDel) { xpDel(b.dataset.xprepDel); return; }
       if (b.dataset.x86 === 'add') add(); else if (b.dataset.x86 === 'back') back(b.dataset.id);
       else if (b.dataset.xwho === 'pick') setWho(b.dataset.name);
       else if (b.dataset.xwho === 'out') setWho('');
@@ -150,6 +212,7 @@
       if (e.key !== 'Enter' || !e.target) return;
       if (e.target.id === 'x86-name' || e.target.id === 'x86-note') { e.preventDefault(); add(); }
       if (e.target.id === 'xwho-txt') { e.preventDefault(); setWho(e.target.value); }
+      if (e.target.id === 'xprep-name' || e.target.id === 'xprep-qty') { e.preventDefault(); xpAdd(); }
     });
     render();
   }
