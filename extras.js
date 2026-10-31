@@ -129,7 +129,10 @@
     var d = xpDay(), items = Object.assign({}, S.xprep.items);
     if (items[id]) { items[id] = Object.assign({}, items[id], { done: Object.assign({}, items[id].done || {}) }); items[id].done[d] = on; }
     S.xprep.items = items;
-    var p = { items: {} }; p.items[id] = { done: {} }; p.items[id].done[d] = on; save('prepextra/board', p);
+    var nm = on ? (who() || null) : null;
+    if (items[id]) { items[id].doneBy = Object.assign({}, items[id].doneBy || {}); items[id].doneBy[d] = nm; }
+    var p = { items: {} }; p.items[id] = { done: {}, doneBy: {} }; p.items[id].done[d] = on; p.items[id].doneBy[d] = nm; save('prepextra/board', p);
+    setTimeout(annotate, 0);
   }
   function xpPlace() {
     if (ui.tab !== 'prep') return;
@@ -193,13 +196,36 @@
     render();
   }
 
-  /* Bylines: after each render, show who ticked each shift item, from the shift's by map. */
+  /* Bylines: initials of whoever ticked each item, on every list that has checkboxes: shift checklists, cleaning,
+     week and month lists, the prep list and extra prep. Names are saved beside each tick (a by map on the same record). */
+  function initials(n) {
+    var w = String(n || '').trim().split(/\s+/).filter(Boolean);
+    if (!w.length) return '';
+    return (w.length === 1 ? w[0].slice(0, 2) : w[0][0] + w[w.length - 1][0]).toUpperCase();
+  }
+  var byDocs = {}, watched = {};
+  function byFor(path) {
+    if (S.shift && path === 'shifts/' + ui.date) return S.shift.by || {};
+    if (!watched[path] && typeof watchDoc === 'function' && typeof db !== 'undefined' && db) {
+      watched[path] = 1;
+      watchDoc(path, function (d) { byDocs[path] = (d && d.by) || {}; annotate(); });
+    }
+    return byDocs[path] || {};
+  }
+  function pill(inp, name) {
+    var lab = inp.closest('label'); if (!lab || !name || lab.querySelector('.x-by')) return;
+    var sm = document.createElement('small'); sm.className = 'x-by'; sm.textContent = initials(name); sm.title = name;
+    (lab.querySelector('span') || lab).appendChild(sm);
+  }
   function annotate() {
-    var by = (S.shift && S.shift.by) || {};
-    document.querySelectorAll('input[data-chk^="shifts/"]:checked').forEach(function (inp) {
-      var id = inp.dataset.chk.split('|')[1], lab = inp.closest('label'); if (!lab || !by[id] || lab.querySelector('.x-by')) return;
-      var sm = document.createElement('small'); sm.className = 'x-by'; sm.textContent = first(by[id]);
-      (lab.querySelector('span') || lab).appendChild(sm);
+    document.querySelectorAll('input[data-chk]:checked').forEach(function (inp) {
+      var p = inp.dataset.chk.split('|'); pill(inp, byFor(p[0])[p[1]]);
+    });
+    document.querySelectorAll('input[data-pdone]:checked').forEach(function (inp) {
+      var d = inp.dataset.pdate || ui.prepDate || iso(new Date()); pill(inp, (((S.prep || {})[d] || {}).by || {})[inp.dataset.pdone]);
+    });
+    document.querySelectorAll('input[data-xprep]:checked').forEach(function (inp) {
+      var x = ((S.xprep && S.xprep.items) || {})[inp.dataset.xprep]; pill(inp, x && x.doneBy && x.doneBy[xpDay()]);
     });
   }
 
@@ -218,13 +244,13 @@
       if (ui.tab === 'todo') ui.tab = 'today';
     }
     var st = document.createElement('style');
-    st.textContent = '.x-by{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font:600 11px var(--f-body,system-ui)}.x-signin .chips .btn{min-height:44px;font-size:16px}';
+    st.textContent = '.x-by{display:inline-block;margin-left:8px;padding:1px 7px;letter-spacing:.04em;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font:600 11px var(--f-body,system-ui)}.x-signin .chips .btn{min-height:44px;font-size:16px}';
     document.head.appendChild(st);
     S.e86 = S.e86 || {}; S.xprep = S.xprep || {};
     var today = VIEWS.today;
     VIEWS.today = function () { return signin() + card() + today(); };
     var r0 = render;
-    render = function () { r0.apply(this, arguments); try { annotate(); xpPlace(); } catch (e) {} };
+    render = function () { r0.apply(this, arguments); try { xpPlace(); annotate(); } catch (e) {} };
     (function watch() {
       if (typeof db === 'undefined' || !db) return setTimeout(watch, 300);
       watchDoc('e86/board', function (d) { S.e86 = d || {}; render(); });
@@ -234,12 +260,22 @@
     document.addEventListener('change', function (e) {
       var inp = e.target; if (!inp || !inp.dataset) return;
       if (inp.dataset.xprep) { e.stopImmediatePropagation(); xpTick(inp.dataset.xprep, inp.checked); return; }
+      var nm = who();
+      if (inp.dataset.pdone) {
+        var pd = inp.dataset.pdate || ui.prepDate || iso(new Date()), pb = {}; pb[inp.dataset.pdone] = inp.checked ? (nm || null) : null;
+        if (!nm && inp.checked) return;
+        save('prep/' + pd, { by: pb });
+        S.prep = S.prep || {}; S.prep[pd] = Object.assign({}, S.prep[pd]); S.prep[pd].by = Object.assign({}, S.prep[pd].by || {}, pb);
+        setTimeout(annotate, 0);
+        return;
+      }
       if (!inp.dataset.chk) return;
       var parts = inp.dataset.chk.split('|'), path = parts[0], id = parts[1];
-      if (path.indexOf('shifts/') !== 0) return;
-      var nm = who(); if (!nm && inp.checked) return;
+      if (!nm && inp.checked) return;
       var by = {}; by[id] = inp.checked ? nm : null; save(path, { by: by });
-      if (S.shift) { S.shift.by = Object.assign({}, S.shift.by || {}, by); }
+      byDocs[path] = Object.assign({}, byDocs[path] || {}, by);
+      if (S.shift && path === 'shifts/' + ui.date) { S.shift.by = Object.assign({}, S.shift.by || {}, by); }
+      setTimeout(annotate, 0);
     }, true);
     document.addEventListener('click', function (e) {
       var b = e.target.closest && e.target.closest('[data-x86],[data-xwho],[data-xprep-add],[data-xprep-del],[data-xprep-on],[data-xprep-off],[data-xprep-edit]'); if (!b) return;
