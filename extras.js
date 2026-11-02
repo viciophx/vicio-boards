@@ -66,8 +66,11 @@
       if (typeof LISTS !== 'undefined' && LISTS.bar_open && !LISTS.bar_open.some(function (s) { return s[0] === 'Before doors open'; })) {
         LISTS.bar_open.push(['Before doors open', [
           'Margaritas batched to par for the night, labeled and dated',
-          'Ice wells full and 2 backup buckets ready. Check ice every hour; refill before it drops below half',
+          'Ice wells full at open',
           'Phones away. No sitting or eating at the bar. Slow moment? Prep or restock']]);
+        /* The rush starts around 10 PM, so the ice gets topped off at 9, before it hits. */
+        LISTS.bar_open.push(['During service', [
+          '9 PM: top off all the ice before the 10 PM rush']]);
         LISTS.bar_close.push(['Set up tomorrow', [
           'Margarita batch level noted so the opener knows how much to batch']]);
         LISTS.host_open.push(['Before doors open', [
