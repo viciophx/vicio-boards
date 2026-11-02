@@ -19,7 +19,9 @@
     'Connect Google Drive in Settings, Connectors, to read the schedule sheet.': 'Conecta Google Drive en Ajustes, Conectores, para leer la hoja de turnos.',
     'Could not read the schedule sheet.': 'No se pudo leer la hoja de turnos.', 'The sheet came back empty.': 'La hoja llegó vacía.',
     'Shift mode': 'Modo turno', 'Exit shift mode': 'Salir del modo turno', 'Meatballs': 'Albóndigas',
-    'Build, bottom layer first': 'Armado, de abajo hacia arriba', 'Ingredients': 'Ingredientes', 'Portions and spec': 'Porciones y especificación', 'Procedure': 'Procedimiento', 'Critical rules': 'Reglas críticas', 'Allergens': 'Alérgenos', 'Notes': 'Notas', 'Mods': 'Modificaciones', 'Food cost': 'Costo de alimentos', 'Extra prep': 'Prep extra', 'Recipe': 'Receta', 'Scrub floor drains': 'Talla las coladeras'
+    'Build, bottom layer first': 'Armado, de abajo hacia arriba', 'Ingredients': 'Ingredientes', 'Portions and spec': 'Porciones y especificación', 'Procedure': 'Procedimiento', 'Critical rules': 'Reglas críticas', 'Allergens': 'Alérgenos', 'Notes': 'Notas', 'Mods': 'Modificaciones', 'Food cost': 'Costo de alimentos', 'Extra prep': 'Prep extra', 'Recipe': 'Receta', 'Scrub floor drains': 'Talla las coladeras',
+    '4 pizzas ready to go before doors: 2 cheese, 2 pepperoni': '4 pizzas listas antes de abrir: 2 de queso, 2 de pepperoni',
+    '4 backup pans in the fridge with dough and cheese, ready to top': '4 charolas de respaldo en el refri con masa y queso, listas para armar'
   };
   if (typeof ES === 'object' && ES) Object.keys(ES_MORE).forEach(function (k) { if (ES[k] == null) ES[k] = ES_MORE[k]; });
   /* Schedule: the Shifts tab also carries Céntrico shifts. These boards show only Vicio shifts (location Vicio, or Vicio in the role). */
@@ -404,6 +406,10 @@
   function start() {
     if (!ready()) return setTimeout(start, 200);
     addRecipes();
+    /* Pizzas staged for the rush (Eric, Nov 1 2026). Added at the end of the opening list so earlier items keep their ids. */
+    if (typeof OPENLIST !== 'undefined' && OPENLIST.indexOf('4 pizzas ready to go before doors: 2 cheese, 2 pepperoni') < 0) {
+      OPENLIST.push('4 pizzas ready to go before doors: 2 cheese, 2 pepperoni', '4 backup pans in the fridge with dough and cheese, ready to top');
+    }
     /* Task wording fixes. Ids stay the same, so past checks still count. No floor mats in the kitchen. */
     if (typeof CLEANING !== 'undefined') CLEANING.forEach(function (day) {
       (day[3] || []).forEach(function (it) { if (it[1] === 'c_drains') it[2] = 'Scrub floor drains'; });
