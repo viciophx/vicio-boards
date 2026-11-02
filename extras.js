@@ -21,7 +21,8 @@
     'Shift mode': 'Modo turno', 'Exit shift mode': 'Salir del modo turno', 'Meatballs': 'Albóndigas',
     'Build, bottom layer first': 'Armado, de abajo hacia arriba', 'Ingredients': 'Ingredientes', 'Portions and spec': 'Porciones y especificación', 'Procedure': 'Procedimiento', 'Critical rules': 'Reglas críticas', 'Allergens': 'Alérgenos', 'Notes': 'Notas', 'Mods': 'Modificaciones', 'Food cost': 'Costo de alimentos', 'Extra prep': 'Prep extra', 'Recipe': 'Receta', 'Scrub floor drains': 'Talla las coladeras',
     '4 pizzas ready to go before doors: 2 cheese, 2 pepperoni': '4 pizzas listas antes de abrir: 2 de queso, 2 de pepperoni',
-    '4 backup pans in the fridge with dough and cheese, ready to top': '4 charolas de respaldo en el refri con masa y queso, listas para armar'
+    '4 backup pans in the fridge with dough and cheese, ready to top': '4 charolas de respaldo en el refri con masa y queso, listas para armar',
+    'Turn on both pizza ovens, 525 top and bottom, 30 minutes before the bake': 'Prende los dos hornos de pizza, 525 arriba y abajo, 30 minutos antes de hornear'
   };
   if (typeof ES === 'object' && ES) Object.keys(ES_MORE).forEach(function (k) { if (ES[k] == null) ES[k] = ES_MORE[k]; });
   /* Schedule: the Shifts tab also carries Céntrico shifts. These boards show only Vicio shifts (location Vicio, or Vicio in the role). */
@@ -415,6 +416,24 @@
     /* Pizzas staged for the rush (Eric, Nov 1 2026). Added at the end of the opening list so earlier items keep their ids. */
     if (typeof OPENLIST !== 'undefined' && OPENLIST.indexOf('4 pizzas ready to go before doors: 2 cheese, 2 pepperoni') < 0) {
       OPENLIST.push('4 pizzas ready to go before doors: 2 cheese, 2 pepperoni', '4 backup pans in the fridge with dough and cheese, ready to top');
+    }
+    /* Dough schedule: ovens on at 5:30 PM, 30 minutes before each 6 PM bake (Eric, Nov 1 2026). Ticks are saved by
+       position, so the new step carries its own key ('ovens') and the existing steps keep their original positions. */
+    if (typeof djobs === 'function' && !djobs.__ovens) {
+      var dj0 = djobs, dd0 = dDone;
+      djobs = function (k) {
+        var a = dj0(k).map(function (j, i) { return Object.assign({}, j, { _i: i }); });
+        var bi = a.findIndex(function (j) { return /^Bake /.test(j.job); });
+        if (bi >= 0) a.splice(bi, 0, { w: a[bi].w, when: '5:30 PM', job: 'Turn on both pizza ovens, 525 top and bottom, 30 minutes before the bake', min: '', s: 'Ovens on', _i: 'ovens' });
+        return a;
+      };
+      djobs.__ovens = true;
+      dDone = function (k, i) { var j = djobs(k)[i]; return dd0(k, j ? j._i : i); };
+      document.addEventListener('change', function (e) {
+        var t = e.target; if (!t || !t.dataset || !t.dataset.dtoggle) return;
+        var p = t.dataset.dtoggle.split('|'), j = djobs(p[0])[+p[1]];
+        if (j && String(j._i) !== p[1]) t.dataset.dtoggle = p[0] + '|' + j._i;
+      }, true);
     }
     /* Task wording fixes. Ids stay the same, so past checks still count. No floor mats in the kitchen. */
     if (typeof CLEANING !== 'undefined') CLEANING.forEach(function (day) {
