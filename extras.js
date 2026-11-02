@@ -80,6 +80,9 @@
         LISTS.host_close.push(['Set up tomorrow', [
           'Cold beer restocked in the storage fridge for tomorrow',
           'Expo window napkins restocked from the attic backups']]);
+        LISTS.host_close.push(['Restrooms after close', [
+          'Women\u2019s restroom checked: clean, trash out, toilet paper, paper towels and soap stocked',
+          'Men\u2019s restroom checked: clean, trash out, toilet paper, paper towels and soap stocked']]);
       }
       /* Special event nights (a buyout or ticketed event booked on Catering & Events): security and a door person. */
       var EV_SEC = LISTS && LISTS.host_open ? LISTS.host_open.length : 99;
