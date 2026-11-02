@@ -59,6 +59,39 @@
       if (typeof VIEWS === 'undefined' || typeof render !== 'function' || typeof save !== 'function' || typeof S === 'undefined' ||
           typeof ui === 'undefined' || typeof window.setWho !== 'function' || typeof whoName !== 'function') return setTimeout(fohStart, 200);
       var fes = function () { return ui.lang === 'es'; }, ft = function (a, b) { return fes() ? b : a; };
+      /* Standards added after a rough weekend (Nov 1 2026). New sections go at the end of each list so the ids of the
+         existing items, and the ticks already saved against them, stay put. */
+      if (typeof LISTS !== 'undefined' && LISTS.bar_open && !LISTS.bar_open.some(function (s) { return s[0] === 'Before doors open'; })) {
+        LISTS.bar_open.push(['Before doors open', [
+          'Margaritas batched to par for the night, labeled and dated',
+          'Ice wells full and 2 backup buckets ready. Check ice every hour; refill before it drops below half',
+          'Phones away. No sitting or eating at the bar. Slow moment? Prep or restock']]);
+        LISTS.bar_close.push(['Set up tomorrow', [
+          'Margarita batch level noted so the opener knows how much to batch']]);
+        LISTS.host_open.push(['Before doors open', [
+          'Cold beer stocked in the storage fridge from the backups',
+          'Napkins stocked in the expo window. Backups are in the attic',
+          'Phones away. No sitting or eating on the floor or at the bar. Slow moment? Prep, restock, or detail']]);
+        LISTS.host_close.push(['Set up tomorrow', [
+          'Cold beer restocked in the storage fridge for tomorrow',
+          'Expo window napkins restocked from the attic backups']]);
+      }
+      /* Special event nights (a buyout or ticketed event booked on Catering & Events): security and a door person. */
+      var EV_SEC = LISTS && LISTS.host_open ? LISTS.host_open.length : 99;
+      function eventNight(d) {
+        try { return Object.values(S.orders || {}).some(function (o) { return o && o.date === d && (o.type === 'buyout' || o.type === 'ticketed') && ['deposit', 'confirmed', 'done'].indexOf(o.status) >= 0; }); } catch (e) { return false; }
+      }
+      if (typeof sections === 'function' && !sections.__ev) {
+        var sec0 = sections;
+        sections = function (key, d) {
+          var out = sec0(key, d);
+          if (key === 'host_open' && eventNight(d)) out.push(['Special event tonight', [
+            ['host_open_' + EV_SEC + '_0', 'Security guard on site and checked in before doors', false],
+            ['host_open_' + EV_SEC + '_1', 'Door person at the door all night (IDs, guest list or tickets)', false]]]);
+          return out;
+        };
+        sections.__ev = true;
+      }
       function ini(n) { var w = String(n || '').trim().split(/\s+/).filter(Boolean); if (!w.length) return ''; return (w.length === 1 ? w[0].slice(0, 2) : w[0][0] + w[w.length - 1][0]).toUpperCase(); }
       function fquick(path, patch) {
         if (typeof db === 'undefined' || !db || !db.doc) return save(path, patch);
