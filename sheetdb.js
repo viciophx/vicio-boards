@@ -30,9 +30,10 @@
   })();
   var API = window.VICIO_API || '';
   if (!API) return;
-  var SHARED = ['events', 'sshifts', 'sstaff', 'schedule', 'caltasks', 'resv', 'e86'];
+  var SHARED = ['events', 'sshifts', 'sstaff', 'schedule', 'caltasks', 'resv', 'e86', 'tr'];
   var PREFIX = window.VICIO_BOARD === 'foh' ? 'foh_' : 'kit_';
-  function mapPath(p) { p = String(p); return SHARED.indexOf(p.split('/')[0]) >= 0 ? p : PREFIX + p; }
+  /* A path starting with ~ is read as written, with no board prefix: FOH reads the kitchen's recipe photos at ~kit_rphotos/<id>. */
+  function mapPath(p) { p = String(p); if (p.charAt(0) === '~') return p.slice(1); return SHARED.indexOf(p.split('/')[0]) >= 0 ? p : PREFIX + p; }
 
   var cache = {};          // full path -> data object
   /* Taps still saving, per path, and the sheet's time on each path's last save from this device. While a path is saving,

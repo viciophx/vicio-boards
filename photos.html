@@ -67,7 +67,7 @@ function compress(file) {
       while (d.length > 180000 && q > .3) { q -= .1; d = cv.toDataURL('image/jpeg', q); }
       res(d);
     };
-    img.onerror = function () { URL.revokeObjectURL(u); rej(); };
+    img.onerror = function () { URL.revokeObjectURL(u); rej('read'); };
     img.src = u;
   });
 }
@@ -100,7 +100,7 @@ document.getElementById('save').addEventListener('click', async function () {
       await VicioStore.db.doc('rphotos/' + id).update({ img: img });
       await VicioStore.db.doc('rcards/' + id).update({ hasPhoto: true });
       r.saved = true; done++; st.className = 'st ok'; st.textContent = 'Saved to ' + r.li.querySelector('select').selectedOptions[0].textContent + '.';
-    } catch (e) { st.className = 'st bad'; st.textContent = 'Not saved. Check the connection and tap Save all again.'; }
+    } catch (e) { st.className = 'st bad'; st.textContent = e === 'read' ? (/image\/hei[cf]/i.test(r.file.type || '') || /\.hei[cf]$/i.test(r.file.name || '') ? 'Couldn\u2019t read that photo. HEIC photos from a Mac don\u2019t load here: upload from the iPhone or iPad, or save it as JPEG first.' : 'Couldn\u2019t read that photo. Try a JPEG or PNG.') : 'Not saved. Check the connection and tap Save all again.'; }
   }
   document.getElementById('msg').textContent = done ? done + ' saved. Open the recipe on the BOH board to see it.' : '';
   btn.disabled = !rows.some(function (r) { return !r.saved; });
