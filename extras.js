@@ -54,7 +54,70 @@
       if (head) { head.insertBefore(b, head.querySelector('.count') || null); } else sec.insertBefore(b, sec.firstChild);
     });
   }
-  var WHO_CSS = '.x-who{margin-left:auto;font:600 12px var(--f-body,system-ui);color:var(--cherry,#8B1E1E);background:var(--cherry-soft,rgba(139,30,30,.1));border:1px solid currentColor;border-radius:999px;padding:4px 10px;min-height:28px;cursor:pointer;white-space:nowrap}.x-who::before{content:"\u25CF ";font-size:9px;vertical-align:1px}.cardhead{flex-wrap:wrap;gap:6px}';
+  /* Shared iPad: more than one person can be signed in. When two or more are, each tick asks who did it. */
+  function askWho(names, title, cb) {
+    var old = document.getElementById('x-askwho'); if (old) old.remove();
+    var m = document.createElement('div'); m.id = 'x-askwho';
+    m.innerHTML = '<div class="x-ask" role="dialog" aria-modal="true"><h3>' + title + '</h3><div class="chips">' +
+      names.map(function (n) { return '<button type="button" class="btn" data-askwho="' + n.replace(/"/g, '&quot;') + '">' + n.replace(/</g, '&lt;') + '</button>'; }).join('') +
+      '</div><button type="button" class="btn x" data-askwho="">' + '\u2715' + '</button></div>';
+    m.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-askwho]');
+      if (b) { e.stopPropagation(); m.remove(); cb(b.dataset.askwho || null); }
+      else if (e.target === m) { m.remove(); cb(null); }
+    }, true);
+    document.body.appendChild(m);
+  }
+  /* A soft two-note chime. iPads only allow sound after the first touch, so the audio is unlocked then. */
+  var audioCtx = null;
+  function unlockAudio() { try { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === 'suspended') audioCtx.resume(); } catch (e) {} }
+  document.addEventListener('touchstart', unlockAudio, { passive: true, once: true });
+  document.addEventListener('click', unlockAudio, { once: true });
+  function chime() {
+    try {
+      if (!audioCtx) return;
+      [[880, 0], [1175, .18]].forEach(function (p) {
+        var o = audioCtx.createOscillator(), g = audioCtx.createGain(), t0 = audioCtx.currentTime + p[1];
+        o.type = 'sine'; o.frequency.value = p[0]; o.connect(g); g.connect(audioCtx.destination);
+        g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.4, t0 + .02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + .5);
+        o.start(t0); o.stop(t0 + .55);
+      });
+    } catch (e) {}
+  }
+  /* Timed alerts: a banner at the top of the screen at a set time, with a chime, until the item is ticked.
+     defs: [{key, at:'HH:MM', until:'HH:MM', text, applies(d) -> bool, done(d) -> bool, mark(d, name)}] */
+  var snooze = {}, rang = {};
+  function runAlerts(defs, dateFn, nameFn) {
+    function tick() {
+      var now = new Date(), hm = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2), d = dateFn();
+      var live = defs.filter(function (a) { return hm >= a.at && hm < a.until && a.applies(d) && !a.done(d) && !(snooze[a.key] > Date.now()); });
+      var el = document.getElementById('x-alert');
+      if (!live.length) { if (el) el.remove(); return; }
+      var a = live[0], late = hm >= a.late;
+      if (!el) { el = document.createElement('div'); el.id = 'x-alert'; document.body.appendChild(el); }
+      el.className = late ? 'late' : '';
+      el.innerHTML = '<div class="x-alert-in"><b>' + a.text + (late ? ' <span class="x-late">' + a.lateText + '</span>' : '') + '</b>' +
+        '<span class="x-alert-btns"><button type="button" class="btn primary" data-alert="done">' + a.doneText + '</button><button type="button" class="btn" data-alert="later">' + a.laterText + '</button></span></div>';
+      el.onclick = function (e) {
+        var b = e.target.closest('[data-alert]'); if (!b) return;
+        if (b.dataset.alert === 'later') { snooze[a.key] = Date.now() + 10 * 60000; el.remove(); return; }
+        var names = nameFn();
+        if (names.length > 1) askWho(names, a.whoText, function (n) { if (n) { a.mark(d, n); el.remove(); } });
+        else { a.mark(d, names[0] || ''); el.remove(); }
+      };
+      var stage = a.key + (late ? ':late' : '');
+      if (!rang[stage]) { rang[stage] = 1; chime(); }
+    }
+    setInterval(tick, 30000); setTimeout(tick, 1500);
+  }
+  var WHO2_CSS = '#x-askwho{position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(24,24,27,.55)}' +
+    '.x-ask{position:relative;width:min(100%,420px);background:var(--surface,#fff);color:var(--ink,#18181B);border-radius:14px;padding:18px 18px 16px;box-shadow:0 12px 40px rgba(0,0,0,.3)}' +
+    '.x-ask h3{margin:0 0 12px;padding-right:40px;font-size:18px}.x-ask .chips .btn{min-height:48px;font-size:17px}.x-ask>.btn.x{position:absolute;top:10px;right:10px;min-height:36px}' +
+    '#x-alert{position:fixed;left:0;right:0;top:0;z-index:9400;padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px;background:var(--cherry,#8B1E1E);color:#fff;box-shadow:0 6px 24px rgba(0,0,0,.35)}' +
+    '#x-alert.late{background:#5A0F0F;animation:x-pulse 1.2s ease-in-out infinite}@keyframes x-pulse{50%{background:#8B1E1E}}' +
+    '.x-alert-in{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;max-width:1100px;margin:0 auto;font-size:17px}.x-late{font-weight:400;opacity:.9}' +
+    '.x-alert-btns{display:flex;gap:8px}#x-alert .btn{min-height:44px}#x-alert .btn.primary{background:#fff;color:var(--cherry,#8B1E1E)}#x-alert .btn:not(.primary){background:transparent;color:#fff;border-color:rgba(255,255,255,.6)}';
+  var WHO_CSS = WHO2_CSS + '.x-who{margin-left:auto;font:600 12px var(--f-body,system-ui);color:var(--cherry,#8B1E1E);background:var(--cherry-soft,rgba(139,30,30,.1));border:1px solid currentColor;border-radius:999px;padding:4px 10px;min-height:28px;cursor:pointer;white-space:nowrap}.x-who::before{content:"\u25CF ";font-size:9px;vertical-align:1px}.cardhead{flex-wrap:wrap;gap:6px}';
   /* FOH: who is on this device, and their initials on everything they tick. The FOH board already saves the name with each
      tick and clears the sign-in at the next shift; this puts the sign-in on Today and Checklists and shows initials. */
   if (BOARD === 'foh') {
@@ -69,7 +132,9 @@
           'Margaritas batched to par for the night, labeled and dated',
           'Ice wells full at open',
           'Phones away. No sitting or eating at the bar. Slow moment? Prep or restock']]);
-        /* The 9 PM ice top-off before the 10 PM rush now lives on the Host / Busser mid shift list (foh.html, host_mid). */
+        /* The rush starts around 10 PM, so the ice gets topped off at 9, before it hits. */
+        LISTS.bar_open.push(['During service', [
+          '9 PM: top off all the ice before the 10 PM rush']]);
         LISTS.bar_close.push(['Set up tomorrow', [
           'Margarita batch level noted so the opener knows how much to batch']]);
         LISTS.host_open.push(['Before doors open', [
@@ -106,16 +171,29 @@
         return db.doc(path).update(patch).then(function () { if (typeof setStatus === 'function') setStatus('Saved', 'ok'); },
           function () { if (typeof setStatus === 'function') setStatus('Not saved. Check your access and try again.', 'bad'); });
       }
+      /* Everyone signed in on this device for the service day. The FOH board's own single sign-in is kept as the first name. */
+      function fnames() {
+        try { var x = JSON.parse(localStorage.getItem('vicio_foh_names') || 'null'); if (x && x.date === svcDate() && Array.isArray(x.names)) return x.names; } catch (e) {}
+        var n = whoName(); return n ? [n] : [];
+      }
+      function setNames(arr) {
+        arr = arr.filter(function (n, i) { return n && arr.indexOf(n) === i; });
+        try { localStorage.setItem('vicio_foh_names', JSON.stringify({ names: arr, date: svcDate() })); } catch (e) {}
+        ui.whoEdit = false;
+        window.setWho(arr[0] || '');
+      }
       function card() {
-        var nm = whoName();
-        if (nm) return '';
+        var names = fnames();
+        if (names.length && !ui.whoEdit) return '';
         var ppl = typeof stPeople === 'function' ? stPeople() : [];
-        ppl = ppl.filter(function (p) { return p.group !== 'Kitchen'; }).concat(ppl.filter(function (p) { return p.group === 'Kitchen'; }));
-        return '<section class="card edge x-signin"><div class="cardhead"><h3>' + ft('Who is on tonight?', '\u00bfQui\u00e9n est\u00e1 esta noche?') + '</h3></div>' +
-          '<p class="status">' + ft('Tap your name so your checks carry it. It clears at the next shift.', 'Toca tu nombre para que tus marcas lo lleven. Se borra en el siguiente turno.') + '</p>' +
+        ppl = ppl.filter(function (p) { return p.group !== 'Kitchen'; }).concat(ppl.filter(function (p) { return p.group === 'Kitchen'; })).filter(function (p) { return names.indexOf(p.name) < 0; });
+        return '<section class="card edge x-signin"><div class="cardhead"><h3>' + (names.length ? ft('On this device', 'En este aparato') : ft('Who is on tonight?', '\u00bfQui\u00e9n est\u00e1 esta noche?')) + '</h3></div>' +
+          (names.length ? '<div class="chips">' + names.map(function (n) { return '<span class="x-tag">' + esc(n) + '<button type="button" class="btn x" data-fwho="rm" data-name="' + esc(n) + '" aria-label="' + ft('Remove', 'Quitar') + ' ' + esc(n) + '">\u00d7</button></span>'; }).join('') + '</div>' : '') +
+          '<p class="status">' + (names.length ? ft('Working off the same iPad? Add the other person too; each tick will ask who did it.', '\u00bfTrabajan en el mismo iPad? Agrega a la otra persona; cada marca preguntar\u00e1 qui\u00e9n la hizo.') : ft('Tap your name so your checks carry it. It clears at the next shift.', 'Toca tu nombre para que tus marcas lo lleven. Se borra en el siguiente turno.')) + '</p>' +
           '<div class="chips">' + ppl.map(function (p) { return '<button type="button" class="btn" data-fwho="pick" data-name="' + esc(p.name) + '">' + esc(first(p.name)) + '</button>'; }).join('') + '</div>' +
           '<div class="padd"><input type="text" id="fwho-txt" placeholder="' + ft('Someone else', 'Otra persona') + '" autocomplete="off" autocapitalize="words">' +
-          '<button type="button" class="btn primary" data-fwho="in">' + ft('Sign in', 'Entrar') + '</button></div></section>';
+          '<button type="button" class="btn primary" data-fwho="in">' + (names.length ? ft('Add', 'Agregar') : ft('Sign in', 'Entrar')) + '</button>' +
+          (names.length ? '<button type="button" class="btn" data-fwho="done">' + ft('Done', 'Listo') + '</button>' : '') + '</div></section>';
       }
       var byDocs = {}, watched = {};
       function byFor(path) {
@@ -134,32 +212,52 @@
         });
       }
       var st = document.createElement('style');
-      st.textContent = '.x-by{display:inline-block;margin-left:8px;padding:1px 7px;letter-spacing:.04em;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font:600 11px var(--f-body,system-ui)}.byline{display:none!important}.x-signin .chips .btn{min-height:44px;font-size:16px}' + WHO_CSS;
+      st.textContent = '.x-by{display:inline-block;margin-left:8px;padding:1px 7px;letter-spacing:.04em;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font:600 11px var(--f-body,system-ui)}.byline{display:none!important}.x-signin .chips .btn{min-height:44px;font-size:16px}.x-tag{display:inline-flex;align-items:center;gap:4px;padding:4px 6px 4px 12px;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font-weight:600}.x-tag .btn.x{min-height:30px;padding:0 8px}' + WHO_CSS;
       document.head.appendChild(st);
       ['today', 'lists'].forEach(function (k) { var v = VIEWS[k]; if (typeof v === 'function') VIEWS[k] = function () { return card() + v.apply(this, arguments); }; });
       var r0 = render;
-      render = function () { r0.apply(this, arguments); try { annotate(); nameChips(whoName(), 'data-fwho', ft('Not you? Tap to switch', '\u00bfNo eres t\u00fa? Toca para cambiar')); } catch (e) {} };
+      render = function () { r0.apply(this, arguments); try { annotate(); nameChips(fnames().join(' + '), 'data-fwho', ft('Tap to add or switch people', 'Toca para agregar o cambiar personas')); } catch (e) {} };
       /* A tap and the name go out together, at once, so a box never flips back while it saves. */
+      function saveTick(path, id, on, nm) {
+        var patch = { done: {} }; patch.done[id] = on;
+        if (nm || !on) { patch.by = {}; patch.by[id] = on ? nm : null; byDocs[path] = Object.assign({}, byDocs[path] || {}, patch.by); }
+        fquick(path, patch);
+        if (S.shift && path === 'shifts/' + ui.date && patch.by) S.shift.by = Object.assign({}, S.shift.by || {}, patch.by);
+        if (typeof markListDone === 'function') markListDone(path, id, on);
+        if (typeof maybeAutoReport === 'function') maybeAutoReport(path, id, on);
+        setTimeout(annotate, 0);
+      }
       document.addEventListener('change', function (e) {
         var inp = e.target; if (!inp || !inp.dataset || !inp.dataset.chk) return;
         e.stopImmediatePropagation();
-        var parts = inp.dataset.chk.split('|'), path = parts[0], id = parts[1], nm = whoName(), patch = { done: {} };
-        patch.done[id] = inp.checked;
-        if (nm || !inp.checked) { patch.by = {}; patch.by[id] = inp.checked ? nm : null; byDocs[path] = Object.assign({}, byDocs[path] || {}, patch.by); }
-        fquick(path, patch);
-        if (S.shift && path === 'shifts/' + ui.date && patch.by) S.shift.by = Object.assign({}, S.shift.by || {}, patch.by);
-        if (typeof markListDone === 'function') markListDone(path, id, inp.checked);
-        if (typeof maybeAutoReport === 'function') maybeAutoReport(path, id, inp.checked);
-        setTimeout(annotate, 0);
+        var parts = inp.dataset.chk.split('|'), path = parts[0], id = parts[1], names = fnames();
+        if (inp.checked && names.length > 1) {
+          askWho(names, ft('Who did this?', '\u00bfQui\u00e9n lo hizo?'), function (n) { if (!n) { inp.checked = false; return; } saveTick(path, id, true, n); });
+          return;
+        }
+        saveTick(path, id, inp.checked, names[0] || '');
       }, true);
       document.addEventListener('click', function (e) {
         var b = e.target.closest && e.target.closest('[data-fwho]'); if (!b) return;
         e.preventDefault(); e.stopImmediatePropagation();
-        if (b.dataset.fwho === 'pick') window.setWho(b.dataset.name);
-        else if (b.dataset.fwho === 'out') window.setWho('');
-        else { var x = document.getElementById('fwho-txt'); if (!x || !x.value.trim()) { if (x) x.focus(); return; } window.setWho(x.value.trim()); }
+        var names = fnames();
+        if (b.dataset.fwho === 'pick') { setNames(names.concat([b.dataset.name])); }
+        else if (b.dataset.fwho === 'rm') { setNames(names.filter(function (n) { return n !== b.dataset.name; })); ui.whoEdit = true; render(); }
+        else if (b.dataset.fwho === 'out') { ui.whoEdit = true; render(); }
+        else if (b.dataset.fwho === 'done') { ui.whoEdit = false; render(); }
+        else { var x = document.getElementById('fwho-txt'); if (!x || !x.value.trim()) { if (x) x.focus(); return; } setNames(names.concat([x.value.trim()])); }
       }, true);
-      document.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target && e.target.id === 'fwho-txt' && e.target.value.trim()) { e.preventDefault(); window.setWho(e.target.value.trim()); } });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target && e.target.id === 'fwho-txt' && e.target.value.trim()) { e.preventDefault(); setNames(fnames().concat([e.target.value.trim()])); } });
+      /* 9 PM ice alert for the bar: a banner and a chime until the 9 PM top-off is ticked; red and chiming again after 9:15. */
+      var ICE_ID = 'bar_open_' + LISTS.bar_open.findIndex(function (s) { return s[0] === 'During service'; }) + '_0';
+      runAlerts([{
+        key: 'ice', at: '21:00', late: '21:15', until: '23:00',
+        text: ft('9 PM: top off all the ice before the 10 PM rush', '9 PM: rellena todo el hielo antes de la hora pico de las 10'),
+        lateText: ft('(running late)', '(ya va tarde)'), doneText: ft('Ice is topped off', 'Hielo listo'), laterText: ft('10 more minutes', '10 minutos m\u00e1s'), whoText: ft('Who topped off the ice?', '\u00bfQui\u00e9n rellen\u00f3 el hielo?'),
+        applies: function (d) { return true; },
+        done: function (d) { return !!(S.shift && S.shift.done && S.shift.done[ICE_ID] && ui.date === d); },
+        mark: function (d, n) { saveTick('shifts/' + d, ICE_ID, true, n); if (S.shift && ui.date === d) { S.shift.done = Object.assign({}, S.shift.done, { [ICE_ID]: true }); } render(); }
+      }], svcDate, fnames);
       render();
     })();
     return;
@@ -170,7 +268,9 @@
   function ready() { return typeof VIEWS !== 'undefined' && typeof render === 'function' && typeof save === 'function' && typeof S !== 'undefined' && typeof ui !== 'undefined'; }
   function es() { return typeof lang === 'function' ? lang() === 'es' : false; }
   function t(en, esx) { return es() ? esx : en; }
-  function who() { return (ui.by || '').trim(); }
+  /* Everyone signed in on this device. ui.by stays the first name for the board's own logs. */
+  function names() { try { var x = JSON.parse(localStorage.getItem('vicio_by') || 'null'); if (Array.isArray(x)) return x.filter(Boolean); if (typeof x === 'string') return [x]; } catch (e) {} var s = ''; try { s = localStorage.getItem('vicio_by') || ''; } catch (e) {} return s ? [s] : []; }
+  function who() { return names()[0] || ''; }
   /* Saves a tap straight to the store, without waiting behind earlier taps, so each one is protected on screen at once. */
   function quick(path, patch) {
     if (typeof db === 'undefined' || !db || !db.doc) return save(path, patch);
@@ -178,7 +278,13 @@
     return db.doc(path).update(patch).then(function () { if (typeof setStatus === 'function') setStatus('Saved', 'ok'); },
       function () { if (typeof setStatus === 'function') setStatus('Not saved. Check your access and try again.', 'bad'); });
   }
-  function setWho(n) { ui.by = (n || '').trim(); try { if (ui.by) localStorage.setItem('vicio_by', ui.by); else localStorage.removeItem('vicio_by'); } catch (e) {} render(); }
+  function setNames(arr) {
+    arr = arr.map(function (n) { return String(n || '').trim(); }).filter(function (n, i) { return n && arr.indexOf(n) === i; });
+    ui.by = arr[0] || '';
+    try { if (arr.length) localStorage.setItem('vicio_by', JSON.stringify(arr)); else localStorage.removeItem('vicio_by'); } catch (e) {}
+    ui.whoEdit = false; render();
+  }
+  function setWho(n) { setNames(n ? [n] : []); }
 
 
   /* Recipe cards from recipes.js go into their group on the Recipes page; esx holds the Spanish card. */
@@ -252,32 +358,15 @@
     return '<section class="card edge x-prep"><div class="cardhead"><h3>Extra prep</h3><span class="count">' + nDone + ' ' + t('of', 'de') + ' ' + items.length + '</span></div>' +
       '<ul class="checks plist">' + rows + '</ul></section>';
   }
-  /* Square tiles with a line icon for the extra prep menu (Eric, Nov 1 2026). The icon is picked from the item's name. */
-  var XP_ICONS = {
-    jar: '<path d="M8 3h8v3H8z"/><path d="M7 6h10l1 3v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9z"/><path d="M6 12h12"/>',
-    drum: '<path d="M14.5 3.5a5 5 0 0 1 3.5 8.5l-4 4-4.5-4.5 4-4a5 5 0 0 1 1-4z"/><path d="M9.5 11.5l-4 4a1.8 1.8 0 1 0 2.5 2.5l.5.5a1.6 1.6 0 1 0 2.3-2.3l-.3-.2 2-2"/>',
-    pan: '<rect x="2.5" y="8" width="15" height="9" rx="1.5"/><path d="M17.5 12.5H22"/><path d="M5.5 11h9"/>',
-    stick: '<rect x="2.5" y="8.5" width="19" height="7" rx="1.5"/><path d="M8 8.5v7"/><path d="M13 8.5v7"/>',
-    leaf: '<path d="M5 19C5 10 11 5 20 4c-.5 9-6 15-15 15z"/><path d="M5 19l9-9"/>',
-    wedge: '<path d="M3 17l14-9 4 3v6z"/><path d="M3 17h18"/><circle cx="12" cy="14" r="1"/><circle cx="16.5" cy="13" r=".8"/>',
-    fries: '<path d="M6 11h12l-1.5 10h-9z"/><path d="M8 11V4M11 11V3M14 11V4M16.5 11V6"/>',
-    bowl: '<path d="M3 11h18a9 9 0 0 1-18 0z"/><path d="M8.5 7.5c0-1.4.9-2.1 1.8-3M13 7.5c0-1.4.9-2.1 1.8-3"/>'
-  };
-  function xpIcon(name) {
-    var n = String(name || '').toLowerCase(), k = /sauce|ranch|salsa|dressing|honey|aioli|macha/.test(n) ? 'jar' : /chicken|brine|tender|thigh|wing/.test(n) ? 'drum' :
-      /dough|shell|pan\b|pans/.test(n) ? 'pan' : /butter/.test(n) ? 'stick' : /onion|jalape|veg|cilantro|basil|lettuce|pickle|pepper|tomato|lime/.test(n) ? 'leaf' :
-      /cheese|mozz|parm|ricotta|queso/.test(n) ? 'wedge' : /fries|fry/.test(n) ? 'fries' : 'bowl';
-    return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + XP_ICONS[k] + '</svg>';
-  }
   function xpMenu() {
     var on = xpToday(), ed = xpEd(), rest = xpItems().filter(function (x) { return !on[x.id]; });
     var chips = rest.map(function (x) {
-      return '<div class="xp-tw"><button type="button" class="xp-tile" data-xprep-on="' + esc(x.id) + '">' + xpIcon(x.name) + '<span>' + esc(x.name) + '</span></button>' +
-        (ed && ui.xpEdit ? '<button type="button" class="xp-x" data-xprep-del="' + esc(x.id) + '" aria-label="' + t('Remove from menu', 'Quitar del men\u00fa') + '">\u00d7</button>' : '') + '</div>';
+      return '<span style="display:inline-flex;align-items:center;gap:2px"><button type="button" class="btn" data-xprep-on="' + esc(x.id) + '">' + esc(x.name) + '</button>' +
+        (ed && ui.xpEdit ? '<button type="button" class="btn x" data-xprep-del="' + esc(x.id) + '" aria-label="' + t('Remove from menu', 'Quitar del men\u00fa') + '">\u00d7</button>' : '') + '</span>';
     }).join('');
     return '<section class="card x-prep-menu"><div class="cardhead"><h3>' + t('Add extra prep', 'Agregar prep extra') + '</h3><span class="count">' + (rest.length ? rest.length + ' ' + t('in the menu', 'en el men\u00fa') : t('All on the list', 'Todo en la lista')) + '</span></div>' +
       '<p class="status">' + t('Tap an item to put it on today\u2019s list.', 'Toca un art\u00edculo para ponerlo en la lista de hoy.') + '</p>' +
-      (chips ? '<div class="xp-tiles">' + chips + '</div>' : '') +
+      (chips ? '<div class="chips">' + chips + '</div>' : '') +
       (ed ? '<div class="padd" style="margin-top:10px"><input type="text" id="xprep-name" placeholder="' + t('New menu item', 'Nuevo art\u00edculo del men\u00fa') + '" autocomplete="off" autocapitalize="sentences">' +
         '<button type="button" class="btn primary" data-xprep-add="1">' + t('Add to menu', 'Agregar al men\u00fa') + '</button>' +
         '<button type="button" class="btn" data-xprep-edit="1">' + (ui.xpEdit ? t('Done editing', 'Listo') : t('Edit menu', 'Editar men\u00fa')) + '</button></div>' : '') + '</section>';
@@ -302,11 +391,11 @@
     S.xprep.items = Object.assign({}, S.xprep.items); delete S.xprep.items[id];
     var p = { items: {} }; p.items[id] = null; xpPatch(p);
   }
-  function xpTick(id, on) {
+  function xpTick(id, on, asName) {
     var d = xpDay(), items = Object.assign({}, S.xprep.items);
     if (items[id]) { items[id] = Object.assign({}, items[id], { done: Object.assign({}, items[id].done || {}) }); items[id].done[d] = on; }
     S.xprep.items = items;
-    var nm = on ? (who() || null) : null;
+    var nm = on ? (asName || who() || null) : null;
     if (items[id]) { items[id].doneBy = Object.assign({}, items[id].doneBy || {}); items[id].doneBy[d] = nm; }
     var p = { items: {} }; p.items[id] = { done: {}, doneBy: {} }; p.items[id].done[d] = on; p.items[id].doneBy[d] = nm; quick('prepextra/board', p);
     setTimeout(annotate, 0);
@@ -321,14 +410,17 @@
 
   /* Sign in: pick a name from the roster, kitchen first, or type one. Kept on this device until "Not me". */
   function signin() {
-    if (who()) return '';
+    var nm = names();
+    if (nm.length && !ui.whoEdit) return '';
     var ppl = typeof stPeople === 'function' ? stPeople() : [];
-    ppl = ppl.filter(function (p) { return p.group === 'Kitchen'; }).concat(ppl.filter(function (p) { return p.group !== 'Kitchen'; }));
-    return '<section class="card edge x-signin"><div class="cardhead"><h3>Who is checking tonight?</h3></div>' +
-      '<p class="status">Tap your name so your checks and logs carry it.</p>' +
+    ppl = ppl.filter(function (p) { return p.group === 'Kitchen'; }).concat(ppl.filter(function (p) { return p.group !== 'Kitchen'; })).filter(function (p) { return nm.indexOf(p.name) < 0; });
+    return '<section class="card edge x-signin"><div class="cardhead"><h3>' + (nm.length ? t('On this device', 'En este aparato') : 'Who is checking tonight?') + '</h3></div>' +
+      (nm.length ? '<div class="chips">' + nm.map(function (n) { return '<span class="x-tag">' + esc(n) + '<button type="button" class="btn x" data-xwho="rm" data-name="' + esc(n) + '" aria-label="' + t('Remove', 'Quitar') + ' ' + esc(n) + '">\u00d7</button></span>'; }).join('') + '</div>' : '') +
+      '<p class="status">' + (nm.length ? t('Working off the same iPad? Add the other person too; each tick will ask who did it.', '\u00bfTrabajan en el mismo iPad? Agrega a la otra persona; cada marca preguntar\u00e1 qui\u00e9n la hizo.') : 'Tap your name so your checks and logs carry it.') + '</p>' +
       '<div class="chips">' + ppl.map(function (p) { return '<button type="button" class="btn" data-xwho="pick" data-name="' + esc(p.name) + '">' + esc(first(p.name)) + '</button>'; }).join('') + '</div>' +
       '<div class="padd"><input type="text" id="xwho-txt" placeholder="' + t('Someone else', 'Otra persona') + '" autocomplete="off" autocapitalize="words">' +
-      '<button type="button" class="btn primary" data-xwho="in">Sign in</button></div></section>';
+      '<button type="button" class="btn primary" data-xwho="in">' + (nm.length ? t('Add', 'Agregar') : 'Sign in') + '</button>' +
+      (nm.length ? '<button type="button" class="btn" data-xwho="done">' + t('Done', 'Listo') + '</button>' : '') + '</div></section>';
   }
 
   /* 86 board, shared with FOH. */
@@ -469,6 +561,7 @@
     }
     var st = document.createElement('style');
     st.textContent = '.x-by{display:inline-block;margin-left:8px;padding:1px 7px;letter-spacing:.04em;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font:600 11px var(--f-body,system-ui)}.x-signin .chips .btn{min-height:44px;font-size:16px}' + WHO_CSS +
+      '.x-tag{display:inline-flex;align-items:center;gap:4px;padding:4px 6px 4px 12px;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font-weight:600}.x-tag .btn.x{min-height:30px;padding:0 8px}' +
       '.x86-btn{position:absolute;top:0;right:0;display:inline-flex;align-items:center;gap:6px;font:700 15px var(--f-head,var(--f-body,system-ui));letter-spacing:.02em;min-height:40px;padding:6px 14px;border-radius:999px;border:1px solid var(--line,#ccc);background:var(--surface,#fff);color:var(--ink,#18181B);cursor:pointer}' +
       '.x86-btn b{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--cherry,#8B1E1E);color:var(--cherry-ink,#fff);font-size:12px}' +
       '.x86-btn.on{border-color:var(--cherry,#8B1E1E);color:var(--cherry,#8B1E1E)}#head h1{padding-right:84px}' +
@@ -476,28 +569,47 @@
       '.x86-panel{position:relative;width:min(100%,520px);max-height:calc(100vh - 90px);overflow:auto;border-radius:14px}.x86-panel .card{margin:0}' +
       '.x86-x{position:absolute;top:10px;right:10px;z-index:1;width:36px;height:36px;border-radius:999px;border:1px solid var(--line,#ccc);background:var(--surface,#fff);color:var(--ink,#18181B);font-size:20px;line-height:1;cursor:pointer}.x86-panel .cardhead{padding-right:44px}' +
       /* Side-by-side cards: a folded card shrinks to its title instead of stretching to its neighbour's height. */
-      '.grid>details.fold{align-self:start}' +
-      '.xp-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}@media (min-width:700px){.xp-tiles{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}}' +
-      '.xp-tw{position:relative}.xp-tile{appearance:none;width:100%;aspect-ratio:1;max-height:118px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px 8px;border:1px solid var(--line,#ccc);border-radius:14px;background:var(--surface,#fff);color:var(--ink,#18181B);cursor:pointer;font:600 13px/1.2 var(--f-body,system-ui);text-align:center;transition:background .2s,border-color .2s}' +
-      '.xp-tile svg{color:var(--cherry,#8B1E1E)}.xp-tile span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}.xp-tile:hover{border-color:var(--cherry,#8B1E1E)}' +
-      '.xp-tile.flash{background:var(--good,#1F7A4D);border-color:var(--good,#1F7A4D);color:#fff}.xp-tile.flash svg{color:#fff}' +
-      '.xp-x{position:absolute;top:-6px;right:-6px;width:28px;height:28px;border-radius:999px;border:1px solid var(--bad,#B3261E);background:var(--surface,#fff);color:var(--bad,#B3261E);font:700 16px/1 system-ui;cursor:pointer}';
+      '.grid>details.fold{align-self:start}';
     document.head.appendChild(st);
     S.e86 = S.e86 || {}; S.xprep = S.xprep || {};
     var today = VIEWS.today;
     VIEWS.today = function () { return signin() + today(); };
     var r0 = render;
-    render = function () { r0.apply(this, arguments); try { xpPlace(); x86Place(); annotate(); nameChips(who(), 'data-xwho', t('Not you? Tap to switch', '\u00bfNo eres t\u00fa? Toca para cambiar')); } catch (e) {} };
+    render = function () { r0.apply(this, arguments); try { xpPlace(); x86Place(); annotate(); nameChips(names().join(' + '), 'data-xwho', t('Tap to add or switch people', 'Toca para agregar o cambiar personas')); } catch (e) {} };
     (function watch() {
       if (typeof db === 'undefined' || !db) return setTimeout(watch, 300);
       watchDoc('e86/board', function (d) { S.e86 = d || {}; render(); });
       watchDoc('prepextra/board', function (d) { S.xprep = d || {}; render(); });
     })();
+    /* 5:30 PM ovens alert on bake days: a banner and a chime until the ovens step is ticked; red and chiming again after 5:45. */
+    runAlerts([{
+      key: 'ovens', at: '17:30', late: '17:45', until: '19:00',
+      text: t('5:30 PM: turn on both pizza ovens, 525 top and bottom. Bake starts at 6', '5:30 PM: prende los dos hornos de pizza, 525 arriba y abajo. Se hornea a las 6'),
+      lateText: t('(running late)', '(ya va tarde)'), doneText: t('Ovens are on', 'Hornos prendidos'), laterText: t('10 more minutes', '10 minutos m\u00e1s'), whoText: t('Who turned on the ovens?', '\u00bfQui\u00e9n prendi\u00f3 los hornos?'),
+      applies: function (d) { return djobs(d).some(function (j) { return j._i === 'ovens'; }); },
+      done: function (d) { var x = S.caldough && S.caldough[d]; return !!(x && x.done && x.done.ovens); },
+      mark: function (d, n) { quick('caldough/' + d, { done: { ovens: true }, by: { ovens: n || null } }); S.caldough = S.caldough || {}; S.caldough[d] = Object.assign({}, S.caldough[d], { done: Object.assign({}, (S.caldough[d] || {}).done, { ovens: true }) }); render(); }
+    }], function () { return iso(new Date()); }, names);
     /* The name rides along with every shift check, next to the tracker's own done flag. */
     document.addEventListener('change', function (e) {
       var inp = e.target; if (!inp || !inp.dataset) return;
-      if (inp.dataset.xprep) { e.stopImmediatePropagation(); xpTick(inp.dataset.xprep, inp.checked); return; }
+      var nms = names();
+      if (inp.dataset.xprep) {
+        e.stopImmediatePropagation();
+        if (inp.checked && nms.length > 1) { askWho(nms, t('Who did this?', '\u00bfQui\u00e9n lo hizo?'), function (n) { if (!n) { inp.checked = false; return; } xpTick(inp.dataset.xprep, true, n); }); return; }
+        xpTick(inp.dataset.xprep, inp.checked); return;
+      }
       /* A tap and the initials are saved together, in one write, instead of the board's save plus a second one for the name. */
+      if (inp.checked && nms.length > 1 && (inp.dataset.pdone || inp.dataset.chk)) {
+        e.stopImmediatePropagation();
+        askWho(nms, t('Who did this?', '\u00bfQui\u00e9n lo hizo?'), function (n) {
+          if (!n) { inp.checked = false; return; }
+          if (inp.dataset.pdone) { var pd2 = inp.dataset.pdate || ui.prepDate || iso(new Date()), pb2 = {}, pdn2 = {}; pb2[inp.dataset.pdone] = n; pdn2[inp.dataset.pdone] = true; quick('prep/' + pd2, { done: pdn2, by: pb2 }); S.prep = S.prep || {}; S.prep[pd2] = Object.assign({}, S.prep[pd2]); S.prep[pd2].by = Object.assign({}, S.prep[pd2].by || {}, pb2); }
+          else { var pt = inp.dataset.chk.split('|'), by2 = {}, dn2 = {}; by2[pt[1]] = n; dn2[pt[1]] = true; quick(pt[0], { done: dn2, by: by2 }); if (typeof checkListDone === 'function') checkListDone(pt[0], pt[1], true); byDocs[pt[0]] = Object.assign({}, byDocs[pt[0]] || {}, by2); if (S.shift && pt[0] === 'shifts/' + ui.date) S.shift.by = Object.assign({}, S.shift.by || {}, by2); }
+          setTimeout(annotate, 0);
+        });
+        return;
+      }
       var nm = who();
       if (inp.dataset.pdone) {
         e.stopImmediatePropagation();
@@ -523,21 +635,23 @@
       e.preventDefault(); e.stopImmediatePropagation();
       if (b.dataset.xprepAdd) { xpAdd(); return; }
       if (b.dataset.xprepDel) { xpDel(b.dataset.xprepDel); return; }
-      if (b.dataset.xprepOn) { var xid = b.dataset.xprepOn; b.classList.add('flash'); b.disabled = true; setTimeout(function () { xpSetDay(xid, true); }, 260); return; }
+      if (b.dataset.xprepOn) { xpSetDay(b.dataset.xprepOn, true); return; }
       if (b.dataset.xprepOff) { xpSetDay(b.dataset.xprepOff, false); return; }
       if (b.dataset.xprepEdit) { ui.xpEdit = !ui.xpEdit; render(); return; }
       if (b.dataset.x86 === 'open') { x86Open(); return; }
       if (b.dataset.x86 === 'close') { x86Close(); return; }
       if (b.dataset.x86 === 'add') add(); else if (b.dataset.x86 === 'back') back(b.dataset.id);
-      else if (b.dataset.xwho === 'pick') setWho(b.dataset.name);
-      else if (b.dataset.xwho === 'out') setWho('');
-      else if (b.dataset.xwho === 'in') { var x = document.getElementById('xwho-txt'); if (!x || !x.value.trim()) { if (x) x.focus(); return; } setWho(x.value); }
+      else if (b.dataset.xwho === 'pick') setNames(names().concat([b.dataset.name]));
+      else if (b.dataset.xwho === 'rm') { setNames(names().filter(function (n) { return n !== b.dataset.name; })); ui.whoEdit = true; render(); }
+      else if (b.dataset.xwho === 'out') { ui.whoEdit = true; render(); }
+      else if (b.dataset.xwho === 'done') { ui.whoEdit = false; render(); }
+      else if (b.dataset.xwho === 'in') { var x = document.getElementById('xwho-txt'); if (!x || !x.value.trim()) { if (x) x.focus(); return; } setNames(names().concat([x.value])); }
     }, true);
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') { x86Close(); return; }
       if (e.key !== 'Enter' || !e.target) return;
       if (e.target.id === 'x86-name' || e.target.id === 'x86-note') { e.preventDefault(); add(); }
-      if (e.target.id === 'xwho-txt') { e.preventDefault(); setWho(e.target.value); }
+      if (e.target.id === 'xwho-txt') { e.preventDefault(); if (e.target.value.trim()) setNames(names().concat([e.target.value])); }
       if (e.target.id === 'xprep-name') { e.preventDefault(); xpAdd(); }
     });
     render();
