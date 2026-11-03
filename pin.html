@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vicio boards: switch PIN</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔑</text></svg>">
+<style>
+:root{--bg:#F6F5F3;--ink:#18181B;--muted:#5E5E66;--cherry:#8B1E1E;--surface:#fff;--line:#E4E2DF;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#161214;--ink:#F3EFEF;--muted:#B4ABAD;--cherry:#C8484A;--surface:#211B1D;--line:#3A3134;color-scheme:dark}}
+*{box-sizing:inherit}body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.45 system-ui,-apple-system,sans-serif}
+main{width:min(100%,520px);margin:0 auto;padding:28px 16px 60px}h1{margin:0 0 6px;font-size:28px;color:var(--cherry)}p{color:var(--muted);margin:0 0 18px}
+a.btn{display:block;margin:10px 0;padding:16px 18px;border-radius:12px;background:var(--surface);border:1px solid var(--line);color:var(--ink);text-decoration:none;font-weight:700}
+a.btn small{display:block;font-weight:400;color:var(--muted);margin-top:2px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Switch this device’s PIN</h1>
+  <p>A board remembers the first PIN typed into it. Tap a board below: it forgets the saved PIN and asks for one again. Type the manager PIN for the Admin pages, recipe photos and the Extra prep menu, or the team PIN to go back to staff.</p>
+  <a class="btn" href="#" data-go="kitchen.html">BOH board<small>Opens the kitchen board and asks for a PIN</small></a>
+  <a class="btn" href="#" data-go="foh.html">Front of house board<small>Opens the FOH board and asks for a PIN</small></a>
+</main>
+<script>
+document.addEventListener('click', function (e) {
+  var a = e.target.closest('[data-go]'); if (!a) return;
+  e.preventDefault();
+  try { localStorage.removeItem('vicio_pin'); } catch (x) {}
+  location.href = a.dataset.go;
+});
+</script>
+</body>
+</html>
