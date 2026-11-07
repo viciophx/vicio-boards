@@ -468,20 +468,30 @@
 
   /* Saturday counts, on the board instead of Typeform. Item lists live in the shared sheet at invitems/board
      ({areas:{<area>:{name, items:[{id,name,unit,par,vendor}]}}}); managers edit them here or on Colette's board.
-     Counts go to inv/<week>/<area> ({c:{itemId:number}, done, by, at}); Colette reads them for the Sunday order. */
+     Counts go to inv/<week>_<area> ({c:{itemId:number}, done, by, at}); Colette reads them for the Sunday order. */
   var AREAS = [['basement', 'Basement'], ['storage', 'Storage'], ['restaurant', 'Restaurant (line, reach-ins, paper)'], ['centrico', 'Centrico order count'], ['beer', 'Beer cooler']];
   var VENDORS = ['Shamrock', 'Costco', 'Centrico', 'Other'];
   function invItems(area) { var a = (S.invitems && S.invitems.areas && S.invitems.areas[area]) || {}; return (a.items || []).filter(function (x) { return x && x.name; }); }
-  function invDoc(area) { return (S.inv && S.inv[ui.week + '/' + area]) || {}; }
+  function invDoc(area) { return (S.inv && S.inv[ui.week + '_' + area]) || {}; }
+  /* What the counts say the par should be. If the order brings each item back to par every week, weekly use is about
+     par minus the Saturday count; the suggested par is the average use over the last weeks plus a 25% cushion.
+     Needs three counted weeks. Also flags items counted at zero in two of the last four weeks. */
+  function invLearn(area, x) {
+    var hist = Object.keys(S.inv || {}).filter(function (k) { return k.slice(11) === area && k.slice(0, 10) < ui.week && S.inv[k].c && S.inv[k].c[x.id] != null && S.inv[k].c[x.id] !== ''; }).sort().slice(-6);
+    var counts = hist.map(function (k) { return +S.inv[k].c[x.id]; }), out = { zeros: counts.slice(-4).filter(function (v) { return v === 0; }).length, n: counts.length, suggest: null };
+    if (x.par != null && counts.length >= 3) { var use = counts.map(function (v) { return Math.max(0, +x.par - v); }); out.suggest = Math.ceil(use.reduce(function (a, b) { return a + b; }, 0) / use.length * 1.25); }
+    return out;
+  }
   function invView() {
     var sat = addDays(ui.week, 6), cur = ui.week === iso(monday(new Date())), ed = xpEd();
     var nDone = AREAS.filter(function (a) { return invDoc(a[0]).done; }).length;
     var cards = AREAS.map(function (a) {
       var items = invItems(a[0]), doc = invDoc(a[0]), c = doc.c || {}, filled = items.filter(function (x) { return c[x.id] != null && c[x.id] !== ''; }).length;
       var rows = items.map(function (x) {
-        var v = c[x.id], low = v != null && v !== '' && x.par != null && +v < +x.par;
+        var v = c[x.id], low = v != null && v !== '' && x.par != null && +v < +x.par, L = invLearn(a[0], x);
+        var hint = (L.suggest != null && L.suggest !== +x.par ? ' <span style="color:var(--cherry,#8B1E1E)">' + t('suggest par', 'sugerido') + ' ' + L.suggest + '</span>' : '') + (L.zeros >= 2 ? ' <span style="color:var(--cherry,#8B1E1E)">' + t('ran out ' + L.zeros + ' of the last 4 weeks', 'se acab\u00f3 ' + L.zeros + ' de las \u00faltimas 4 semanas') + '</span>' : '');
         return '<li style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line,#ddd)"><span style="flex:1;min-width:0"><b>' + esc(x.name) + '</b>' +
-          (x.unit || x.par != null ? '<small style="display:block;color:var(--muted)">' + esc([x.unit, x.par != null ? t('par', 'par') + ' ' + x.par : '', x.vendor].filter(Boolean).join(' \u00b7 ')) + '</small>' : '') + '</span>' +
+          (x.unit || x.par != null || hint ? '<small style="display:block;color:var(--muted)">' + esc([x.unit, x.par != null ? t('par', 'par') + ' ' + x.par : '', x.vendor].filter(Boolean).join(' \u00b7 ')) + hint + '</small>' : '') + '</span>' +
           '<input type="number" inputmode="decimal" step="0.1" min="0" value="' + (v == null ? '' : esc(String(v))) + '" data-inv="' + a[0] + '|' + esc(x.id) + '" style="width:84px;text-align:center;font-size:18px;padding:8px 6px;border-radius:10px;border:1px solid var(--line,#ccc);background:var(--surface,#fff);color:var(--ink,#18181B)' + (low ? ';border-color:var(--cherry,#8B1E1E)' : '') + '" aria-label="' + esc(x.name) + '">' +
           (ed && ui.invEdit ? '<button type="button" class="btn x" data-inv-del="' + a[0] + '|' + esc(x.id) + '" aria-label="' + t('Remove', 'Quitar') + '">\u00d7</button>' : '') + '</li>';
       }).join('');
@@ -501,11 +511,11 @@
       '<div class="grid">' + cards + '</div>';
   }
   function invSetCount(area, id, v) {
-    var k = ui.week + '/' + area; S.inv = S.inv || {}; S.inv[k] = Object.assign({}, S.inv[k]); S.inv[k].c = Object.assign({}, S.inv[k].c); S.inv[k].c[id] = v;
+    var k = ui.week + '_' + area; S.inv = S.inv || {}; S.inv[k] = Object.assign({}, S.inv[k]); S.inv[k].c = Object.assign({}, S.inv[k].c); S.inv[k].c[id] = v;
     var p = { c: {} }; p.c[id] = v; quick('inv/' + k, p);
   }
   function invDone(area, n) {
-    var k = ui.week + '/' + area, rec = { done: true, by: n || who() || '', at: Date.now() };
+    var k = ui.week + '_' + area, rec = { done: true, by: n || who() || '', at: Date.now() };
     S.inv = S.inv || {}; S.inv[k] = Object.assign({}, S.inv[k], rec); quick('inv/' + k, rec);
     var wk = {}; wk['inv_' + area] = true; save('weeks/' + ui.week, { done: wk });
     render();
