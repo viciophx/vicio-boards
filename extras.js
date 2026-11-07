@@ -466,6 +466,61 @@
     if (typeof translateDom === 'function') translateDom();
   }
 
+  /* Saturday counts, on the board instead of Typeform. Item lists live in the shared sheet at invitems/board
+     ({areas:{<area>:{name, items:[{id,name,unit,par,vendor}]}}}); managers edit them here or on Colette's board.
+     Counts go to inv/<week>/<area> ({c:{itemId:number}, done, by, at}); Colette reads them for the Sunday order. */
+  var AREAS = [['basement', 'Basement'], ['storage', 'Storage'], ['restaurant', 'Restaurant (line, reach-ins, paper)'], ['centrico', 'Centrico order count'], ['beer', 'Beer cooler']];
+  var VENDORS = ['Shamrock', 'Costco', 'Centrico', 'Other'];
+  function invItems(area) { var a = (S.invitems && S.invitems.areas && S.invitems.areas[area]) || {}; return (a.items || []).filter(function (x) { return x && x.name; }); }
+  function invDoc(area) { return (S.inv && S.inv[ui.week + '/' + area]) || {}; }
+  function invView() {
+    var sat = addDays(ui.week, 6), cur = ui.week === iso(monday(new Date())), ed = xpEd();
+    var nDone = AREAS.filter(function (a) { return invDoc(a[0]).done; }).length;
+    var cards = AREAS.map(function (a) {
+      var items = invItems(a[0]), doc = invDoc(a[0]), c = doc.c || {}, filled = items.filter(function (x) { return c[x.id] != null && c[x.id] !== ''; }).length;
+      var rows = items.map(function (x) {
+        var v = c[x.id], low = v != null && v !== '' && x.par != null && +v < +x.par;
+        return '<li style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line,#ddd)"><span style="flex:1;min-width:0"><b>' + esc(x.name) + '</b>' +
+          (x.unit || x.par != null ? '<small style="display:block;color:var(--muted)">' + esc([x.unit, x.par != null ? t('par', 'par') + ' ' + x.par : '', x.vendor].filter(Boolean).join(' \u00b7 ')) + '</small>' : '') + '</span>' +
+          '<input type="number" inputmode="decimal" step="0.1" min="0" value="' + (v == null ? '' : esc(String(v))) + '" data-inv="' + a[0] + '|' + esc(x.id) + '" style="width:84px;text-align:center;font-size:18px;padding:8px 6px;border-radius:10px;border:1px solid var(--line,#ccc);background:var(--surface,#fff);color:var(--ink,#18181B)' + (low ? ';border-color:var(--cherry,#8B1E1E)' : '') + '" aria-label="' + esc(x.name) + '">' +
+          (ed && ui.invEdit ? '<button type="button" class="btn x" data-inv-del="' + a[0] + '|' + esc(x.id) + '" aria-label="' + t('Remove', 'Quitar') + '">\u00d7</button>' : '') + '</li>';
+      }).join('');
+      return '<section class="card' + (doc.done ? '' : ' edge') + '"><div class="cardhead"><h3>' + esc(a[1]) + '</h3>' +
+        (doc.done ? '<span class="pill good">' + t('Counted', 'Contado') + '</span>' : '<span class="count">' + filled + ' ' + t('of', 'de') + ' ' + items.length + '</span>') + '</div>' +
+        (doc.done ? '<p class="status">' + t('Counted by', 'Cont\u00f3') + ' <b>' + esc(doc.by || '?') + '</b> ' + new Date(doc.at).toLocaleString(es() ? 'es-MX' : 'en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' }) + '. ' + t('Numbers can still be fixed below.', 'Los n\u00fameros a\u00fan se pueden corregir abajo.') + '</p>' : '') +
+        (items.length ? '<ul style="list-style:none;margin:0;padding:0">' + rows + '</ul>' : '<p class="status">' + t('No items yet. A manager adds them with Edit items, or on Colette\u2019s board.', 'A\u00fan no hay art\u00edculos. Un gerente los agrega con Editar art\u00edculos, o en el tablero de Colette.') + '</p>') +
+        (ed && ui.invEdit ? '<div class="padd" style="margin-top:10px;flex-wrap:wrap"><input type="text" data-inv-new="name" placeholder="' + t('Item', 'Art\u00edculo') + '" autocomplete="off" style="flex:2 1 140px;width:auto"><input type="text" data-inv-new="unit" placeholder="' + t('Unit (case, each)', 'Unidad') + '" autocomplete="off" style="flex:1 1 90px;width:auto"><input type="number" inputmode="decimal" data-inv-new="par" placeholder="Par" style="flex:0 1 70px;width:auto"><select data-inv-new="vendor" style="flex:1 1 100px">' + VENDORS.map(function (v) { return '<option>' + v + '</option>'; }).join('') + '</select><button type="button" class="btn primary" data-inv-add="' + a[0] + '">' + t('Add', 'Agregar') + '</button></div>' : '') +
+        (items.length && !doc.done ? '<div class="padd" style="margin-top:10px"><button type="button" class="btn primary" data-inv-done="' + a[0] + '">' + t('Count done', 'Conteo listo') + '</button></div>' : '') + '</section>';
+    }).join('');
+    return '<div class="bar"><div class="nav"><button class="btn" data-act="wprev" aria-label="Previous week">Back</button>' +
+      '<div class="date">Saturday ' + esc(fmt(sat, { day: 'numeric' })) + (cur ? ' <span class="pill good">This week</span>' : '') + '</div>' +
+      '<button class="btn" data-act="wnext" aria-label="Next week">Next</button>' + (cur ? '' : '<button class="btn" data-act="wtoday">This week</button>') + '</div>' +
+      '<span class="count">' + nDone + ' ' + t('of', 'de') + ' ' + AREAS.length + ' ' + t('counted', 'contados') + '</span></div>' +
+      '<div class="standard"><span>Saturday close</span><p>' + t('Count everything, type the number next to each item, then tap Count done on each area. Partials in tenths, 0.1 to 0.9. Colette builds the Sunday order from these.', 'Cuenta todo, escribe el n\u00famero junto a cada art\u00edculo y toca Conteo listo en cada \u00e1rea. Parciales en d\u00e9cimas, 0.1 a 0.9. Colette arma el pedido del domingo con esto.') + '</p></div>' +
+      (ed ? '<div class="padd" style="margin:0 0 10px"><button type="button" class="btn" data-inv-edit="1">' + (ui.invEdit ? t('Done editing', 'Listo') : t('Edit items', 'Editar art\u00edculos')) + '</button></div>' : '') +
+      '<div class="grid">' + cards + '</div>';
+  }
+  function invSetCount(area, id, v) {
+    var k = ui.week + '/' + area; S.inv = S.inv || {}; S.inv[k] = Object.assign({}, S.inv[k]); S.inv[k].c = Object.assign({}, S.inv[k].c); S.inv[k].c[id] = v;
+    var p = { c: {} }; p.c[id] = v; quick('inv/' + k, p);
+  }
+  function invDone(area, n) {
+    var k = ui.week + '/' + area, rec = { done: true, by: n || who() || '', at: Date.now() };
+    S.inv = S.inv || {}; S.inv[k] = Object.assign({}, S.inv[k], rec); quick('inv/' + k, rec);
+    var wk = {}; wk['inv_' + area] = true; save('weeks/' + ui.week, { done: wk });
+    render();
+  }
+  function invAdd(area, card) {
+    var g = function (f) { var el = card.querySelector('[data-inv-new="' + f + '"]'); return el ? el.value.trim() : ''; }, name = g('name'); if (!name) return;
+    var item = { id: 'i' + Date.now().toString(36), name: name, unit: g('unit'), par: g('par') === '' ? null : +g('par'), vendor: g('vendor') };
+    S.invitems = S.invitems || {}; S.invitems.areas = Object.assign({}, S.invitems.areas); var a = Object.assign({ name: area }, S.invitems.areas[area]); a.items = (a.items || []).concat([item]); S.invitems.areas[area] = a;
+    var p = { areas: {} }; p.areas[area] = { name: area, items: a.items }; quick('invitems/board', p); render();
+  }
+  function invDel(area, id) {
+    S.invitems.areas[area].items = S.invitems.areas[area].items.filter(function (x) { return x.id !== id; });
+    var p = { areas: {} }; p.areas[area] = { items: S.invitems.areas[area].items }; quick('invitems/board', p); render();
+  }
+
   /* Sign in: pick a name from the roster, kitchen first, or type one. Kept on this device until "Not me". */
   function signin() {
     var nm = names();
@@ -629,7 +684,8 @@
       /* Side-by-side cards: a folded card shrinks to its title instead of stretching to its neighbour's height. */
       '.grid>details.fold{align-self:start}';
     document.head.appendChild(st);
-    S.e86 = S.e86 || {}; S.xprep = S.xprep || {};
+    S.e86 = S.e86 || {}; S.xprep = S.xprep || {}; S.inv = S.inv || {}; S.invitems = S.invitems || {};
+    if (VIEWS.inventory) VIEWS.inventory = invView;
     var closeOpts = {
       t: t, es: es, date: function () { return iso(new Date()); }, names: names,
       lists: function (d) {
@@ -653,6 +709,8 @@
       watchDoc('e86/board', function (d) { S.e86 = d || {}; render(); });
       watchDoc('prepextra/board', function (d) { S.xprep = d || {}; render(); });
       watchDoc('closeout/' + iso(new Date()), function (x) { S.xclose = S.xclose || {}; S.xclose[iso(new Date())] = x && x.at ? x : null; render(); });
+      watchDoc('invitems/board', function (d) { S.invitems = d || {}; render(); });
+      watchCol('inv', function (d) { S.inv = d || {}; if (ui.tab === 'inventory' && !(document.activeElement && document.activeElement.dataset && document.activeElement.dataset.inv)) render(); });
     })();
     /* 5:30 PM ovens alert on bake days: a banner and a chime until the ovens step is ticked; red and chiming again after 5:45. */
     runAlerts([{
@@ -666,6 +724,7 @@
     /* The name rides along with every shift check, next to the tracker's own done flag. */
     document.addEventListener('change', function (e) {
       var inp = e.target; if (!inp || !inp.dataset) return;
+      if (inp.dataset.inv) { e.stopImmediatePropagation(); var ip = inp.dataset.inv.split('|'); invSetCount(ip[0], ip[1], inp.value === '' ? null : +inp.value); return; }
       var nms = names();
       if (inp.dataset.xprep) {
         e.stopImmediatePropagation();
@@ -704,9 +763,13 @@
       setTimeout(annotate, 0);
     }, true);
     document.addEventListener('click', function (e) {
-      var b = e.target.closest && e.target.closest('[data-x86],[data-xwho],[data-xprep-add],[data-xprep-del],[data-xprep-on],[data-xprep-off],[data-xprep-edit],[data-xclose]'); if (!b) return;
+      var b = e.target.closest && e.target.closest('[data-x86],[data-xwho],[data-xprep-add],[data-xprep-del],[data-xprep-on],[data-xprep-off],[data-xprep-edit],[data-xclose],[data-inv-done],[data-inv-add],[data-inv-del],[data-inv-edit]'); if (!b) return;
       e.preventDefault(); e.stopImmediatePropagation();
       if (b.dataset.xclose) { closeNight(closeOpts); return; }
+      if (b.dataset.invEdit) { ui.invEdit = !ui.invEdit; render(); return; }
+      if (b.dataset.invAdd) { invAdd(b.dataset.invAdd, b.closest('section')); return; }
+      if (b.dataset.invDel) { var dp = b.dataset.invDel.split('|'); invDel(dp[0], dp[1]); return; }
+      if (b.dataset.invDone) { var ar = b.dataset.invDone, nn = names(); if (nn.length > 1) askWho(nn, t('Who counted?', '\u00bfQui\u00e9n cont\u00f3?'), function (n) { if (n) invDone(ar, n); }); else invDone(ar, nn[0] || ''); return; }
       if (b.dataset.xprepAdd) { xpAdd(); return; }
       if (b.dataset.xprepDel) { xpDel(b.dataset.xprepDel); return; }
       if (b.dataset.xprepOn) { xpSetDay(b.dataset.xprepOn, true); return; }
