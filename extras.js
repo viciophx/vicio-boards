@@ -117,6 +117,41 @@
     '#x-alert.late{background:#5A0F0F;animation:x-pulse 1.2s ease-in-out infinite}@keyframes x-pulse{50%{background:#8B1E1E}}' +
     '.x-alert-in{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;max-width:1100px;margin:0 auto;font-size:17px}.x-late{font-weight:400;opacity:.9}' +
     '.x-alert-btns{display:flex;gap:8px}#x-alert .btn{min-height:44px}#x-alert .btn.primary{background:#fff;color:var(--cherry,#8B1E1E)}#x-alert .btn:not(.primary){background:transparent;color:#fff;border-color:rgba(255,255,255,.6)}';
+  /* Close the night: the closer signs the night off. Every list must be at least 90% done; under that, the board asks for
+     one line about why and saves it with the sign-off. Stored at closeout/<date> {by, at, pct, lists, reason}. */
+  var TARGET = 90;
+  function closeCard(opts) {
+    var T = opts.t, d = opts.date(), info = opts.lists(d), tot = 0, dn = 0;
+    info.forEach(function (l) { tot += l.n; dn += l.done; });
+    var pct = tot ? Math.round(100 * dn / tot) : 0, low = info.filter(function (l) { return l.n && Math.round(100 * l.done / l.n) < TARGET; });
+    var c = opts.closed(d);
+    var rows = info.filter(function (l) { return l.n; }).map(function (l) { var p = Math.round(100 * l.done / l.n); return '<li style="display:flex;justify-content:space-between;gap:10px;padding:6px 0"><span>' + l.name + '</span><b style="color:' + (p >= TARGET ? 'var(--good,#1F6B3A)' : 'var(--cherry,#8B1E1E)') + '">' + l.done + ' / ' + l.n + ' \u00b7 ' + p + '%</b></li>'; }).join('');
+    if (c && c.at) {
+      var when = new Date(c.at).toLocaleTimeString(opts.es() ? 'es-MX' : 'en-US', { hour: 'numeric', minute: '2-digit' });
+      return '<section class="card x-close done"><div class="cardhead"><h3>' + T('Night closed', 'Noche cerrada') + '</h3><span class="count">' + c.pct + '%</span></div>' +
+        '<p class="status">' + T('Closed by', 'Cerrada por') + ' <b>' + esc(c.by || '?') + '</b> ' + T('at', 'a las') + ' ' + when + (c.reason ? '. ' + T('Note', 'Nota') + ': ' + esc(c.reason) : '') + '</p></section>';
+    }
+    return '<section class="card x-close' + (low.length ? ' edge' : '') + '"><div class="cardhead"><h3>' + T('Close the night', 'Cerrar la noche') + '</h3><span class="count">' + pct + '% \u00b7 ' + T('target', 'meta') + ' ' + TARGET + '%</span></div>' +
+      '<ul class="plist" style="list-style:none;margin:0 0 8px;padding:0">' + rows + '</ul>' +
+      (low.length ? '<p class="status">' + T('Under ' + TARGET + '% on ' + low.length + (low.length === 1 ? ' list' : ' lists') + '. Finish them, or write one line about why and close anyway.', 'Menos de ' + TARGET + '% en ' + low.length + (low.length === 1 ? ' lista' : ' listas') + '. Term\u00ednalas, o escribe una l\u00ednea de por qu\u00e9 y cierra de todos modos.') + '</p>' +
+        '<div class="padd"><input type="text" id="x-close-why" placeholder="' + T('Why is it under ' + TARGET + '%?', '\u00bfPor qu\u00e9 qued\u00f3 bajo ' + TARGET + '%?') + '" autocomplete="off" style="flex:1 1 200px;width:auto"></div>' : '<p class="status">' + T('Everything is above ' + TARGET + '%. Sign it off.', 'Todo est\u00e1 arriba de ' + TARGET + '%. F\u00edrmala.') + '</p>') +
+      '<div class="padd"><button type="button" class="btn primary" data-xclose="1">' + T('Close the night', 'Cerrar la noche') + '</button></div></section>';
+  }
+  function closeNight(opts) {
+    var d = opts.date(), info = opts.lists(d), tot = 0, dn = 0;
+    info.forEach(function (l) { tot += l.n; dn += l.done; });
+    var pct = tot ? Math.round(100 * dn / tot) : 0, low = info.filter(function (l) { return l.n && Math.round(100 * l.done / l.n) < TARGET; });
+    var why = document.getElementById('x-close-why'), reason = why ? why.value.trim() : '';
+    if (low.length && !reason) { if (why) { why.focus(); why.style.borderColor = 'var(--cherry,#8B1E1E)'; } return; }
+    var names = opts.names();
+    function go(n) {
+      var rec = { by: n || '', at: Date.now(), pct: pct, lists: info.map(function (l) { return [l.name, l.done, l.n]; }), reason: reason || null };
+      opts.save(d, rec);
+    }
+    if (names.length > 1) askWho(names, opts.t('Who is closing?', '\u00bfQui\u00e9n cierra?'), function (n) { if (n) go(n); });
+    else go(names[0] || '');
+  }
+  var CLOSE_CSS = '.x-close.done{border-color:var(--good,#1F6B3A)}.x-close.done .count{color:var(--good,#1F6B3A)}';
   /* Staff page: the roster in two columns, BOH (Kitchen) and FOH (everyone else), instead of one long list. */
   function rosterCols() {
     if (ui.tab !== 'staff') return;
@@ -131,7 +166,7 @@
     ul.replaceWith(wrap);
   }
   var ROSTER_CSS = '.x-roster{margin:4px 0 12px}.x-roster .x-rh{margin:0 0 6px;font:700 13px var(--f-mono,monospace);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}.x-roster .x-rh span{font-weight:400}.x-roster ul{margin:0}';
-  var WHO_CSS = ROSTER_CSS + WHO2_CSS + '.x-who{margin-left:auto;font:600 12px var(--f-body,system-ui);color:var(--cherry,#8B1E1E);background:var(--cherry-soft,rgba(139,30,30,.1));border:1px solid currentColor;border-radius:999px;padding:4px 10px;min-height:28px;cursor:pointer;white-space:nowrap}.x-who::before{content:"\u25CF ";font-size:9px;vertical-align:1px}.cardhead{flex-wrap:wrap;gap:6px}';
+  var WHO_CSS = CLOSE_CSS + ROSTER_CSS + WHO2_CSS + '.x-who{margin-left:auto;font:600 12px var(--f-body,system-ui);color:var(--cherry,#8B1E1E);background:var(--cherry-soft,rgba(139,30,30,.1));border:1px solid currentColor;border-radius:999px;padding:4px 10px;min-height:28px;cursor:pointer;white-space:nowrap}.x-who::before{content:"\u25CF ";font-size:9px;vertical-align:1px}.cardhead{flex-wrap:wrap;gap:6px}';
   /* FOH: who is on this device, and their initials on everything they tick. The FOH board already saves the name with each
      tick and clears the sign-in at the next shift; this puts the sign-in on Today and Checklists and shows initials. */
   if (BOARD === 'foh') {
@@ -228,7 +263,16 @@
       var st = document.createElement('style');
       st.textContent = '.x-by{display:inline-block;margin-left:8px;padding:1px 7px;letter-spacing:.04em;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font:600 11px var(--f-body,system-ui)}.byline{display:none!important}.x-signin .chips .btn{min-height:44px;font-size:16px}.x-tag{display:inline-flex;align-items:center;gap:4px;padding:4px 6px 4px 12px;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font-weight:600}.x-tag .btn.x{min-height:30px;padding:0 8px}' + WHO_CSS;
       document.head.appendChild(st);
-      ['today', 'lists'].forEach(function (k) { var v = VIEWS[k]; if (typeof v === 'function') VIEWS[k] = function () { return card() + v.apply(this, arguments); }; });
+      var closeOpts = {
+        t: ft, es: fes, date: svcDate, names: fnames,
+        lists: function (d) { var dn = (S.shift && ui.date === d ? S.shift.done : null) || {}; return ['host_open', 'host_close', 'bar_open', 'bar_close'].map(function (k) { var items = sections(k, d).flatMap(function (s) { return s[1]; }); return { name: (k.indexOf('host') === 0 ? 'Host / Busser ' : 'Bartender ') + (k.slice(-4) === 'open' ? 'open' : 'close'), n: items.length, done: items.filter(function (x) { return dn[x[0]]; }).length }; }); },
+        closed: function (d) { return S.xclose && S.xclose[d]; },
+        save: function (d, rec) { S.xclose = S.xclose || {}; S.xclose[d] = rec; fquick('closeout/' + d, rec); render(); }
+      };
+      S.xclose = S.xclose || {};
+      ['today', 'lists'].forEach(function (k) { var v = VIEWS[k]; if (typeof v === 'function') VIEWS[k] = function () { return card() + v.apply(this, arguments) + closeCard(closeOpts); }; });
+      (function watchClose() { if (typeof db === 'undefined' || !db) return setTimeout(watchClose, 300); watchDoc('closeout/' + svcDate(), function (x) { S.xclose = S.xclose || {}; S.xclose[svcDate()] = x && x.at ? x : null; render(); }); })();
+      document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-xclose]'); if (!b) return; e.preventDefault(); e.stopImmediatePropagation(); closeNight(closeOpts); }, true);
       var r0 = render;
       render = function () { r0.apply(this, arguments); try { rosterCols(); annotate(); nameChips(fnames().join(' + '), 'data-fwho', ft('Tap to add or switch people', 'Toca para agregar o cambiar personas')); } catch (e) {} };
       /* A tap and the name go out together, at once, so a box never flips back while it saves. */
@@ -586,14 +630,29 @@
       '.grid>details.fold{align-self:start}';
     document.head.appendChild(st);
     S.e86 = S.e86 || {}; S.xprep = S.xprep || {};
+    var closeOpts = {
+      t: t, es: es, date: function () { return iso(new Date()); }, names: names,
+      lists: function (d) {
+        var dn = (S.shift && ui.date === d ? S.shift.done : null) || {}, out = [];
+        Object.keys(LISTS).forEach(function (pre) { var items = LISTS[pre][1](); out.push({ name: LISTS[pre][0], n: items.length, done: items.filter(function (x, i) { return dn[pre + i]; }).length }); });
+        var on = ((S.xprep && S.xprep.days) || {})[d] || {}, xi = Object.keys((S.xprep && S.xprep.items) || {}).filter(function (id) { return on[id]; });
+        if (xi.length) out.push({ name: 'Extra prep', n: xi.length, done: xi.filter(function (id) { var x = S.xprep.items[id]; return x && x.done && x.done[d]; }).length });
+        var jobs = djobs(d); if (jobs.length) out.push({ name: 'Dough schedule', n: jobs.length, done: jobs.filter(function (j, i) { return dDone(d, i); }).length });
+        return out;
+      },
+      closed: function (d) { return S.xclose && S.xclose[d]; },
+      save: function (d, rec) { S.xclose = S.xclose || {}; S.xclose[d] = rec; quick('closeout/' + d, rec); render(); }
+    };
+    S.xclose = S.xclose || {};
     var today = VIEWS.today;
-    VIEWS.today = function () { return signin() + today(); };
+    VIEWS.today = function () { return signin() + today() + closeCard(closeOpts); };
     var r0 = render;
     render = function () { r0.apply(this, arguments); try { rosterCols(); xpPlace(); x86Place(); annotate(); nameChips(names().join(' + '), 'data-xwho', t('Tap to add or switch people', 'Toca para agregar o cambiar personas')); } catch (e) {} };
     (function watch() {
       if (typeof db === 'undefined' || !db) return setTimeout(watch, 300);
       watchDoc('e86/board', function (d) { S.e86 = d || {}; render(); });
       watchDoc('prepextra/board', function (d) { S.xprep = d || {}; render(); });
+      watchDoc('closeout/' + iso(new Date()), function (x) { S.xclose = S.xclose || {}; S.xclose[iso(new Date())] = x && x.at ? x : null; render(); });
     })();
     /* 5:30 PM ovens alert on bake days: a banner and a chime until the ovens step is ticked; red and chiming again after 5:45. */
     runAlerts([{
@@ -645,8 +704,9 @@
       setTimeout(annotate, 0);
     }, true);
     document.addEventListener('click', function (e) {
-      var b = e.target.closest && e.target.closest('[data-x86],[data-xwho],[data-xprep-add],[data-xprep-del],[data-xprep-on],[data-xprep-off],[data-xprep-edit]'); if (!b) return;
+      var b = e.target.closest && e.target.closest('[data-x86],[data-xwho],[data-xprep-add],[data-xprep-del],[data-xprep-on],[data-xprep-off],[data-xprep-edit],[data-xclose]'); if (!b) return;
       e.preventDefault(); e.stopImmediatePropagation();
+      if (b.dataset.xclose) { closeNight(closeOpts); return; }
       if (b.dataset.xprepAdd) { xpAdd(); return; }
       if (b.dataset.xprepDel) { xpDel(b.dataset.xprepDel); return; }
       if (b.dataset.xprepOn) { xpSetDay(b.dataset.xprepOn, true); return; }
