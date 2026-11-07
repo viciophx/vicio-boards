@@ -117,7 +117,21 @@
     '#x-alert.late{background:#5A0F0F;animation:x-pulse 1.2s ease-in-out infinite}@keyframes x-pulse{50%{background:#8B1E1E}}' +
     '.x-alert-in{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;max-width:1100px;margin:0 auto;font-size:17px}.x-late{font-weight:400;opacity:.9}' +
     '.x-alert-btns{display:flex;gap:8px}#x-alert .btn{min-height:44px}#x-alert .btn.primary{background:#fff;color:var(--cherry,#8B1E1E)}#x-alert .btn:not(.primary){background:transparent;color:#fff;border-color:rgba(255,255,255,.6)}';
-  var WHO_CSS = WHO2_CSS + '.x-who{margin-left:auto;font:600 12px var(--f-body,system-ui);color:var(--cherry,#8B1E1E);background:var(--cherry-soft,rgba(139,30,30,.1));border:1px solid currentColor;border-radius:999px;padding:4px 10px;min-height:28px;cursor:pointer;white-space:nowrap}.x-who::before{content:"\u25CF ";font-size:9px;vertical-align:1px}.cardhead{flex-wrap:wrap;gap:6px}';
+  /* Staff page: the roster in two columns, BOH (Kitchen) and FOH (everyone else), instead of one long list. */
+  function rosterCols() {
+    if (ui.tab !== 'staff') return;
+    var ul = document.querySelector('ul.rlist'); if (!ul || ul.closest('.x-roster')) return;
+    var lis = Array.prototype.slice.call(ul.children);
+    var boh = lis.filter(function (li) { var g = li.querySelector('.ptag'), r = li.querySelector('.rr'); return (g && /kitchen|cocina/i.test(g.textContent)) || (r && /cook|cocin|dish|prep|chef|kitchen/i.test(r.textContent)); }), foh = lis.filter(function (li) { return boh.indexOf(li) < 0; });
+    var wrap = document.createElement('div'); wrap.className = 'grid x-roster';
+    [['FOH', foh], ['BOH', boh]].forEach(function (col) {
+      var d = document.createElement('div'); d.innerHTML = '<h4 class="x-rh">' + col[0] + ' <span>' + col[1].length + '</span></h4>';
+      var u = document.createElement('ul'); u.className = ul.className; col[1].forEach(function (li) { u.appendChild(li); }); d.appendChild(u); wrap.appendChild(d);
+    });
+    ul.replaceWith(wrap);
+  }
+  var ROSTER_CSS = '.x-roster{margin:4px 0 12px}.x-roster .x-rh{margin:0 0 6px;font:700 13px var(--f-mono,monospace);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}.x-roster .x-rh span{font-weight:400}.x-roster ul{margin:0}';
+  var WHO_CSS = ROSTER_CSS + WHO2_CSS + '.x-who{margin-left:auto;font:600 12px var(--f-body,system-ui);color:var(--cherry,#8B1E1E);background:var(--cherry-soft,rgba(139,30,30,.1));border:1px solid currentColor;border-radius:999px;padding:4px 10px;min-height:28px;cursor:pointer;white-space:nowrap}.x-who::before{content:"\u25CF ";font-size:9px;vertical-align:1px}.cardhead{flex-wrap:wrap;gap:6px}';
   /* FOH: who is on this device, and their initials on everything they tick. The FOH board already saves the name with each
      tick and clears the sign-in at the next shift; this puts the sign-in on Today and Checklists and shows initials. */
   if (BOARD === 'foh') {
@@ -216,7 +230,7 @@
       document.head.appendChild(st);
       ['today', 'lists'].forEach(function (k) { var v = VIEWS[k]; if (typeof v === 'function') VIEWS[k] = function () { return card() + v.apply(this, arguments); }; });
       var r0 = render;
-      render = function () { r0.apply(this, arguments); try { annotate(); nameChips(fnames().join(' + '), 'data-fwho', ft('Tap to add or switch people', 'Toca para agregar o cambiar personas')); } catch (e) {} };
+      render = function () { r0.apply(this, arguments); try { rosterCols(); annotate(); nameChips(fnames().join(' + '), 'data-fwho', ft('Tap to add or switch people', 'Toca para agregar o cambiar personas')); } catch (e) {} };
       /* A tap and the name go out together, at once, so a box never flips back while it saves. */
       function saveTick(path, id, on, nm) {
         var patch = { done: {} }; patch.done[id] = on;
@@ -575,7 +589,7 @@
     var today = VIEWS.today;
     VIEWS.today = function () { return signin() + today(); };
     var r0 = render;
-    render = function () { r0.apply(this, arguments); try { xpPlace(); x86Place(); annotate(); nameChips(names().join(' + '), 'data-xwho', t('Tap to add or switch people', 'Toca para agregar o cambiar personas')); } catch (e) {} };
+    render = function () { r0.apply(this, arguments); try { rosterCols(); xpPlace(); x86Place(); annotate(); nameChips(names().join(' + '), 'data-xwho', t('Tap to add or switch people', 'Toca para agregar o cambiar personas')); } catch (e) {} };
     (function watch() {
       if (typeof db === 'undefined' || !db) return setTimeout(watch, 300);
       watchDoc('e86/board', function (d) { S.e86 = d || {}; render(); });
