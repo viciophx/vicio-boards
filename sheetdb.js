@@ -10,6 +10,9 @@
 (function () {
   /* Page add-ons (extras.js) load on every board, connected or not, always fresh. */
   try { var xs = document.createElement('script'); xs.src = 'extras.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(xs); } catch (e) {}
+  /* Online pickup orders (orders-addon.js): the same screen Colette's Board runs, so the iPads hear and work orders too.
+     It waits for the store, so it is fine to load before the PIN. ord and osettings are shared across the boards. */
+  try { var os = document.createElement('script'); os.src = 'orders-addon.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(os); } catch (e) {}
   /* Self-update: a board left open on an iPad never reloads its own code. version.txt changes with every update to the boards;
      when it does, the page reloads itself the next time nobody is typing, so new features reach the iPads without anyone touching them. */
   (function () {
@@ -30,7 +33,7 @@
   })();
   var API = window.VICIO_API || '';
   if (!API) return;
-  var SHARED = ['events', 'sshifts', 'sstaff', 'schedule', 'caltasks', 'resv', 'e86', 'tr'];
+  var SHARED = ['events', 'sshifts', 'sstaff', 'schedule', 'caltasks', 'resv', 'e86', 'tr', 'ord', 'osettings'];
   var PREFIX = window.VICIO_BOARD === 'foh' ? 'foh_' : 'kit_';
   /* A path starting with ~ is read as written, with no board prefix: FOH reads the kitchen's recipe photos at ~kit_rphotos/<id>. */
   function mapPath(p) { p = String(p); if (p.charAt(0) === '~') return p.slice(1); return SHARED.indexOf(p.split('/')[0]) >= 0 ? p : PREFIX + p; }
