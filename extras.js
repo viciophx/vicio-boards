@@ -133,6 +133,7 @@
     }
     return '<section class="card x-close' + (low.length ? ' edge' : '') + '"><div class="cardhead"><h3>' + T('Close the night', 'Cerrar la noche') + '</h3><span class="count">' + pct + '% \u00b7 ' + T('target', 'meta') + ' ' + TARGET + '%</span></div>' +
       '<ul class="plist" style="list-style:none;margin:0 0 8px;padding:0">' + rows + '</ul>' +
+      '<p class="status"><b>' + iceLine(T, opts.es()) + '</b></p>' +
       (low.length ? '<p class="status">' + T('Under ' + TARGET + '% on ' + low.length + (low.length === 1 ? ' list' : ' lists') + '. Finish them, or write one line about why and close anyway.', 'Menos de ' + TARGET + '% en ' + low.length + (low.length === 1 ? ' lista' : ' listas') + '. Term\u00ednalas, o escribe una l\u00ednea de por qu\u00e9 y cierra de todos modos.') + '</p>' +
         '<div class="padd"><input type="text" id="x-close-why" placeholder="' + T('Why is it under ' + TARGET + '%?', '\u00bfPor qu\u00e9 qued\u00f3 bajo ' + TARGET + '%?') + '" autocomplete="off" style="flex:1 1 200px;width:auto"></div>' : '<p class="status">' + T('Everything is above ' + TARGET + '%. Sign it off.', 'Todo est\u00e1 arriba de ' + TARGET + '%. F\u00edrmala.') + '</p>') +
       '<div class="padd"><button type="button" class="btn primary" data-xclose="1">' + T('Close the night', 'Cerrar la noche') + '</button></div></section>';
@@ -151,7 +152,32 @@
     if (names.length > 1) askWho(names, opts.t('Who is closing?', '\u00bfQui\u00e9n cierra?'), function (n) { if (n) go(n); });
     else go(names[0] || '');
   }
-  var CLOSE_CSS = '.x-close.done{border-color:var(--good,#1F6B3A)}.x-close.done .count{color:var(--good,#1F6B3A)}';
+  /* Ice machine: one shared switch both boards see (e86/icemachine, in the collection the boards already share).
+     Whoever turns it on or off taps the matching button, so anyone can see its state, who changed it and when. */
+  function iceState() { return (S.ice && typeof S.ice.on === 'boolean') ? S.ice : null; }
+  function iceLine(T, es) {
+    var x = iceState(); if (!x) return T('Ice machine: not logged yet', 'M\u00e1quina de hielo: sin registro');
+    var when = new Date(x.at).toLocaleString(es ? 'es-MX' : 'en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+    return T('Ice machine', 'M\u00e1quina de hielo') + ': ' + (x.on ? T('ON', 'PRENDIDA') : T('OFF', 'APAGADA')) + ' \u00b7 ' + esc(x.by || '?') + ', ' + when;
+  }
+  function iceCard(T, es) {
+    var x = iceState(), on = x && x.on;
+    var when = x ? new Date(x.at).toLocaleString(es ? 'es-MX' : 'en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : '';
+    var log = x && x.log ? Object.keys(x.log).sort().reverse().slice(1, 4).map(function (k) { var l = x.log[k]; return (l.on ? T('on', 'prendida') : T('off', 'apagada')) + ' \u00b7 ' + esc(l.by || '?') + ' \u00b7 ' + new Date(+k).toLocaleString(es ? 'es-MX' : 'en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' }); }).join('<br>') : '';
+    return '<section class="card x-ice ' + (x ? (on ? 'on' : 'off') : '') + '"><div class="cardhead"><h3>' + T('Ice machine', 'M\u00e1quina de hielo') + '</h3>' +
+      '<span class="x-ice-st">' + (x ? (on ? T('ON', 'PRENDIDA') : T('OFF', 'APAGADA')) : T('Not logged', 'Sin registro')) + '</span></div>' +
+      (x ? '<p class="status">' + T((on ? 'Turned on' : 'Turned off') + ' by', (on ? 'Prendida' : 'Apagada') + ' por') + ' <b>' + esc(x.by || '?') + '</b>, ' + when + '</p>' : '<p class="status">' + T('Tap the button when you turn it on or off, so everyone knows its state.', 'Toca el bot\u00f3n cuando la prendas o apagues, para que todos sepan c\u00f3mo est\u00e1.') + '</p>') +
+      '<div class="padd"><button type="button" class="btn' + (on ? '' : ' primary') + '" data-ice="on">' + T('I turned it ON', 'La prend\u00ed') + '</button><button type="button" class="btn' + (x && !on ? '' : ' primary') + '" data-ice="off">' + T('I turned it OFF', 'La apagu\u00e9') + '</button></div>' +
+      (log ? '<p class="status" style="margin-top:6px">' + T('Before that', 'Antes') + ':<br>' + log + '</p>' : '') + '</section>';
+  }
+  function iceSet(on, n, saver) {
+    var at = Date.now(), rec = { on: on, by: n || '', at: at, log: {} }; rec.log[at] = { on: on, by: n || '' };
+    S.ice = Object.assign({}, S.ice, { on: on, by: n || '', at: at, log: Object.assign({}, (S.ice && S.ice.log) || {}, rec.log) });
+    saver('e86/icemachine', rec);
+  }
+  var ICE_CSS = '.x-ice .x-ice-st{font:800 20px var(--f-head,var(--f-body,system-ui));letter-spacing:.04em;padding:4px 14px;border-radius:999px;border:2px solid var(--line,#ccc)}' +
+    '.x-ice.on .x-ice-st{color:var(--good,#1F6B3A);border-color:var(--good,#1F6B3A)}.x-ice.off .x-ice-st{color:var(--cherry,#8B1E1E);border-color:var(--cherry,#8B1E1E)}.x-ice .padd .btn{min-height:48px;font-size:16px}';
+  var CLOSE_CSS = ICE_CSS + '.x-close.done{border-color:var(--good,#1F6B3A)}.x-close.done .count{color:var(--good,#1F6B3A)}';
   /* Staff page: the roster in two columns, BOH (Kitchen) and FOH (everyone else), instead of one long list. */
   function rosterCols() {
     if (ui.tab !== 'staff') return;
@@ -308,7 +334,14 @@
         VIEWS.training = function () { var html = tr0.apply(this, arguments); return (typeof tq !== 'undefined' && tq.items && tq.items.length) || ui.trk ? html : tablesCard(false) + expoCard() + html; };
         VIEWS.training.__expo = true;
       }
-      ['today', 'service'].forEach(function (k) { var v = VIEWS[k]; if (typeof v === 'function' && !v.__tables) { VIEWS[k] = function () { return v.apply(this, arguments) + tablesCard(true); }; VIEWS[k].__tables = true; } });
+      ['today', 'service'].forEach(function (k) { var v = VIEWS[k]; if (typeof v === 'function' && !v.__tables) { VIEWS[k] = function () { return v.apply(this, arguments) + iceCard(ft, fes()) + tablesCard(true); }; VIEWS[k].__tables = true; } });
+      (function watchIce() { if (typeof db === 'undefined' || !db) return setTimeout(watchIce, 300); watchDoc('e86/icemachine', function (d) { S.ice = d || null; render(); }); })();
+      document.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('[data-ice]'); if (!b) return; e.preventDefault(); e.stopImmediatePropagation();
+        var on = b.dataset.ice === 'on', nm = fnames();
+        if (nm.length > 1) askWho(nm, ft('Who turned it ' + (on ? 'on' : 'off') + '?', '\u00bfQui\u00e9n la ' + (on ? 'prendi\u00f3' : 'apag\u00f3') + '?'), function (n) { if (n) { iceSet(on, n, fquick); render(); } });
+        else { iceSet(on, nm[0] || '', fquick); render(); }
+      }, true);
       var expoDraft = null;
       document.addEventListener('input', function (e) { var x = e.target; if (!x.dataset || !x.dataset.expo) return; var p = x.dataset.expo.split('|'); expoDraft = expoDraft || expoRows().map(function (r) { return r.slice(); }); expoDraft[+p[0]][+p[1]] = x.value; });
       document.addEventListener('click', function (e) {
@@ -770,7 +803,7 @@
     };
     S.xclose = S.xclose || {};
     var today = VIEWS.today;
-    VIEWS.today = function () { return signin() + today() + closeCard(closeOpts); };
+    VIEWS.today = function () { return signin() + today() + iceCard(t, es()) + closeCard(closeOpts); };
     var r0 = render;
     render = function () { r0.apply(this, arguments); try { rosterCols(); xpPlace(); x86Place(); annotate(); nameChips(names().join(' + '), 'data-xwho', t('Tap to add or switch people', 'Toca para agregar o cambiar personas')); } catch (e) {} };
     (function watch() {
@@ -779,6 +812,7 @@
       watchDoc('prepextra/board', function (d) { S.xprep = d || {}; render(); });
       watchDoc('closeout/' + iso(new Date()), function (x) { S.xclose = S.xclose || {}; S.xclose[iso(new Date())] = x && x.at ? x : null; render(); });
       watchDoc('invitems/board', function (d) { S.invitems = d || {}; render(); });
+      watchDoc('e86/icemachine', function (d) { S.ice = d || null; render(); });
       watchCol('inv', function (d) { S.inv = d || {}; if (ui.tab === 'inventory' && !(document.activeElement && document.activeElement.dataset && document.activeElement.dataset.inv)) render(); });
     })();
     /* 5:30 PM ovens alert on bake days: a banner and a chime until the ovens step is ticked; red and chiming again after 5:45. */
@@ -832,9 +866,10 @@
       setTimeout(annotate, 0);
     }, true);
     document.addEventListener('click', function (e) {
-      var b = e.target.closest && e.target.closest('[data-x86],[data-xwho],[data-xprep-add],[data-xprep-del],[data-xprep-on],[data-xprep-off],[data-xprep-edit],[data-xclose],[data-inv-done],[data-inv-add],[data-inv-del],[data-inv-edit]'); if (!b) return;
+      var b = e.target.closest && e.target.closest('[data-x86],[data-xwho],[data-xprep-add],[data-xprep-del],[data-xprep-on],[data-xprep-off],[data-xprep-edit],[data-xclose],[data-inv-done],[data-inv-add],[data-inv-del],[data-inv-edit],[data-ice]'); if (!b) return;
       e.preventDefault(); e.stopImmediatePropagation();
       if (b.dataset.xclose) { closeNight(closeOpts); return; }
+      if (b.dataset.ice) { var ion = b.dataset.ice === 'on', inm = names(); if (inm.length > 1) askWho(inm, t('Who turned it ' + (ion ? 'on' : 'off') + '?', '\u00bfQui\u00e9n la ' + (ion ? 'prendi\u00f3' : 'apag\u00f3') + '?'), function (n) { if (n) { iceSet(ion, n, quick); render(); } }); else { iceSet(ion, inm[0] || '', quick); render(); } return; }
       if (b.dataset.invEdit) { ui.invEdit = !ui.invEdit; render(); return; }
       if (b.dataset.invAdd) { invAdd(b.dataset.invAdd, b.closest('section')); return; }
       if (b.dataset.invDel) { var dp = b.dataset.invDel.split('|'); invDel(dp[0], dp[1]); return; }
