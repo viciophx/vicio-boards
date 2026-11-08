@@ -1,0 +1,1187 @@
+/* Vicio board add-ons, loaded by sheetdb.js on the GitHub boards and inlined into Colette's Board.
+   Kitchen: sign in by name at the top of Today (the name goes on every check and log), bylines on checked items,
+   and an 86 card on the same shared 86 list as the FOH board (e86/board). Both boards: Spanish for the new text. */
+(function () {
+  if (window.__vicioExtras) return;
+  window.__vicioExtras = true;
+  var BOARD = window.VICIO_BOARD;
+
+  /* Spanish for text added outside the boards' own dictionaries. Each board's translateDom swaps exact text nodes. */
+  var ES_MORE = {
+    '86 board': 'Pizarra de 86', 'Nothing out': 'Nada agotado', 'out': 'agotados', '86 it': 'Ponerlo en 86', 'Back in': 'Ya hay',
+    'When the kitchen or the bar runs out of something, put it here. The FOH board and Colette see it right away.': 'Cuando a la cocina o a la barra se le acabe algo, anótalo aquí. La pizarra de FOH y Colette lo ven al instante.',
+    'On this phone': 'En este teléfono', 'Not me': 'No soy yo', 'Who is checking tonight?': '¿Quién está marcando esta noche?',
+    'Tap your name so your checks and logs carry it.': 'Toca tu nombre para que tus marcas y registros lo lleven.', 'Sign in': 'Entrar',
+    'Shared live with the team': 'Compartido en vivo con el equipo', 'Shared across devices': 'Compartido entre dispositivos',
+    'Shifts come from': 'Los turnos vienen de', 'the Vicio Schedule sheet': 'la hoja Vicio Schedule',
+    'Open this page in claude.ai with Google Drive connected to read the schedule sheet.': 'Abre esta página en claude.ai con Google Drive conectado para leer la hoja de turnos.',
+    'Allow Google Drive for this page to read the schedule sheet.': 'Permite Google Drive en esta página para leer la hoja de turnos.',
+    'Connect Google Drive in Settings, Connectors, to read the schedule sheet.': 'Conecta Google Drive en Ajustes, Conectores, para leer la hoja de turnos.',
+    'Could not read the schedule sheet.': 'No se pudo leer la hoja de turnos.', 'The sheet came back empty.': 'La hoja llegó vacía.',
+    'Shift mode': 'Modo turno', 'Exit shift mode': 'Salir del modo turno', 'Meatballs': 'Albóndigas',
+    'Build, bottom layer first': 'Armado, de abajo hacia arriba', 'Ingredients': 'Ingredientes', 'Portions and spec': 'Porciones y especificación', 'Procedure': 'Procedimiento', 'Critical rules': 'Reglas críticas', 'Allergens': 'Alérgenos', 'Notes': 'Notas', 'Mods': 'Modificaciones', 'Food cost': 'Costo de alimentos', 'Extra prep': 'Prep extra', 'Recipe': 'Receta', 'Scrub floor drains': 'Talla las coladeras',
+    '4 pizzas ready to go before doors: 2 cheese, 2 pepperoni': '4 pizzas listas antes de abrir: 2 de queso, 2 de pepperoni',
+    '4 backup pans in the fridge with dough and cheese, ready to top': '4 charolas de respaldo en el refri con masa y queso, listas para armar',
+    'Turn on both pizza ovens, 525 top and bottom, 30 minutes before the bake': 'Prende los dos hornos de pizza, 525 arriba y abajo, 30 minutos antes de hornear'
+  };
+  if (typeof ES === 'object' && ES) Object.keys(ES_MORE).forEach(function (k) { if (ES[k] == null) ES[k] = ES_MORE[k]; });
+  /* Schedule: the Shifts tab also carries Céntrico shifts. These boards show only Vicio shifts (location Vicio, or Vicio in the role). */
+  (function vicioOnly() {
+    if (typeof sheetShifts !== 'function' || typeof mergeShifts !== 'function' || typeof S === 'undefined' || typeof render !== 'function') return setTimeout(vicioOnly, 200);
+    if (sheetShifts.__vicio) return;
+    var ss0 = sheetShifts;
+    sheetShifts = function (csv) {
+      var all = ss0(csv), out = {};
+      Object.keys(all).forEach(function (id) { var x = all[id]; if (x && (x.org === 'Vicio' || /vicio/i.test(x.role || ''))) out[id] = x; });
+      return out;
+    };
+    sheetShifts.__vicio = true;
+    if (S.sheetCsv) { S.sheet = sheetShifts(S.sheetCsv); mergeShifts(); render(); }
+  })();
+  /* Once someone is signed in, the sign-in card goes away and their name sits in the header of every checklist card
+     instead. Tapping the name signs them out so the next person can pick theirs. */
+  function nameChips(name, attr, label) {
+    document.querySelectorAll('section.card,details.card').forEach(function (sec) {
+      if (sec.classList.contains('x-signin') || !sec.querySelector('input[data-chk],input[data-pdone],input[data-xprep]')) return;
+      var old = sec.querySelector('.x-who');
+      if (!name) { if (old) old.remove(); return; }
+      if (old) { if (old.dataset.n === name) return; old.remove(); }
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'x-who'; b.setAttribute(attr, 'out'); b.dataset.n = name;
+      b.title = label; b.setAttribute('aria-label', name + '. ' + label);
+      b.textContent = name;
+      var head = sec.querySelector('.cardhead');
+      /* Inside a fold's header the name must not open or close the fold when tapped. */
+      if (head) { head.insertBefore(b, head.querySelector('.count') || null); } else sec.insertBefore(b, sec.firstChild);
+    });
+  }
+  /* Shared iPad: more than one person can be signed in. When two or more are, each tick asks who did it. */
+  function askWho(names, title, cb) {
+    var old = document.getElementById('x-askwho'); if (old) old.remove();
+    var m = document.createElement('div'); m.id = 'x-askwho';
+    m.innerHTML = '<div class="x-ask" role="dialog" aria-modal="true"><h3>' + title + '</h3><div class="chips">' +
+      names.map(function (n) { return '<button type="button" class="btn" data-askwho="' + n.replace(/"/g, '&quot;') + '">' + n.replace(/</g, '&lt;') + '</button>'; }).join('') +
+      '</div><button type="button" class="btn x" data-askwho="">' + '\u2715' + '</button></div>';
+    m.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-askwho]');
+      if (b) { e.stopPropagation(); m.remove(); cb(b.dataset.askwho || null); }
+      else if (e.target === m) { m.remove(); cb(null); }
+    }, true);
+    document.body.appendChild(m);
+  }
+  /* A soft two-note chime. iPads only allow sound after the first touch, so the audio is unlocked then. */
+  var audioCtx = null;
+  function unlockAudio() { try { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === 'suspended') audioCtx.resume(); } catch (e) {} }
+  document.addEventListener('touchstart', unlockAudio, { passive: true, once: true });
+  document.addEventListener('click', unlockAudio, { once: true });
+  function chime() {
+    try {
+      if (!audioCtx) return;
+      [[880, 0], [1175, .18]].forEach(function (p) {
+        var o = audioCtx.createOscillator(), g = audioCtx.createGain(), t0 = audioCtx.currentTime + p[1];
+        o.type = 'sine'; o.frequency.value = p[0]; o.connect(g); g.connect(audioCtx.destination);
+        g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.4, t0 + .02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + .5);
+        o.start(t0); o.stop(t0 + .55);
+      });
+    } catch (e) {}
+  }
+  /* Timed alerts: a banner at the top of the screen at a set time, with a chime, until the item is ticked.
+     defs: [{key, at:'HH:MM', until:'HH:MM', text, applies(d) -> bool, done(d) -> bool, mark(d, name)}] */
+  var snooze = {}, rang = {};
+  function runAlerts(defs, dateFn, nameFn) {
+    function tick() {
+      var now = new Date(), hm = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2), d = dateFn();
+      var live = defs.filter(function (a) { return hm >= a.at && hm < a.until && a.applies(d) && !a.done(d) && !(snooze[a.key] > Date.now()); });
+      var el = document.getElementById('x-alert');
+      if (!live.length) { if (el) el.remove(); return; }
+      var a = live[0], late = hm >= a.late;
+      if (!el) { el = document.createElement('div'); el.id = 'x-alert'; document.body.appendChild(el); }
+      el.className = late ? 'late' : '';
+      el.innerHTML = '<div class="x-alert-in"><b>' + a.text + (late ? ' <span class="x-late">' + a.lateText + '</span>' : '') + '</b>' +
+        '<span class="x-alert-btns"><button type="button" class="btn primary" data-alert="done">' + a.doneText + '</button><button type="button" class="btn" data-alert="later">' + a.laterText + '</button></span></div>';
+      el.onclick = function (e) {
+        var b = e.target.closest('[data-alert]'); if (!b) return;
+        if (b.dataset.alert === 'later') { snooze[a.key] = Date.now() + 10 * 60000; el.remove(); return; }
+        var names = nameFn();
+        if (names.length > 1) askWho(names, a.whoText, function (n) { if (n) { a.mark(d, n); el.remove(); } });
+        else { a.mark(d, names[0] || ''); el.remove(); }
+      };
+      var stage = a.key + (late ? ':late' : '');
+      if (!rang[stage]) { rang[stage] = 1; chime(); }
+    }
+    setInterval(tick, 30000); setTimeout(tick, 1500);
+  }
+  var WHO2_CSS = '#x-askwho{position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(24,24,27,.55)}' +
+    '.x-ask{position:relative;width:min(100%,420px);background:var(--surface,#fff);color:var(--ink,#18181B);border-radius:14px;padding:18px 18px 16px;box-shadow:0 12px 40px rgba(0,0,0,.3)}' +
+    '.x-ask h3{margin:0 0 12px;padding-right:40px;font-size:18px}.x-ask .chips .btn{min-height:48px;font-size:17px}.x-ask>.btn.x{position:absolute;top:10px;right:10px;min-height:36px}' +
+    '#x-alert{position:fixed;left:0;right:0;top:0;z-index:9400;padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px;background:var(--cherry,#8B1E1E);color:#fff;box-shadow:0 6px 24px rgba(0,0,0,.35)}' +
+    '#x-alert.late{background:#5A0F0F;animation:x-pulse 1.2s ease-in-out infinite}@keyframes x-pulse{50%{background:#8B1E1E}}' +
+    '.x-alert-in{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;max-width:1100px;margin:0 auto;font-size:17px}.x-late{font-weight:400;opacity:.9}' +
+    '.x-alert-btns{display:flex;gap:8px}#x-alert .btn{min-height:44px}#x-alert .btn.primary{background:#fff;color:var(--cherry,#8B1E1E)}#x-alert .btn:not(.primary){background:transparent;color:#fff;border-color:rgba(255,255,255,.6)}';
+  /* Close the night: the closer signs the night off. Every list must be at least 90% done; under that, the board asks for
+     one line about why and saves it with the sign-off. Stored at closeout/<date> {by, at, pct, lists, reason}. */
+  var TARGET = 90;
+  function closeCard(opts) {
+    var T = opts.t, d = opts.date(), info = opts.lists(d), tot = 0, dn = 0;
+    info.forEach(function (l) { tot += l.n; dn += l.done; });
+    var pct = tot ? Math.round(100 * dn / tot) : 0, low = info.filter(function (l) { return l.n && Math.round(100 * l.done / l.n) < TARGET; });
+    var c = opts.closed(d);
+    var rows = info.filter(function (l) { return l.n; }).map(function (l) { var p = Math.round(100 * l.done / l.n); return '<li style="display:flex;justify-content:space-between;gap:10px;padding:6px 0"><span>' + l.name + '</span><b style="color:' + (p >= TARGET ? 'var(--good,#1F6B3A)' : 'var(--cherry,#8B1E1E)') + '">' + l.done + ' / ' + l.n + ' \u00b7 ' + p + '%</b></li>'; }).join('');
+    if (c && c.at) {
+      var when = new Date(c.at).toLocaleTimeString(opts.es() ? 'es-MX' : 'en-US', { hour: 'numeric', minute: '2-digit' });
+      return '<section class="card x-close done"><div class="cardhead"><h3>' + T('Night closed', 'Noche cerrada') + '</h3><span class="count">' + c.pct + '%</span></div>' +
+        '<p class="status">' + T('Closed by', 'Cerrada por') + ' <b>' + esc(c.by || '?') + '</b> ' + T('at', 'a las') + ' ' + when + (c.reason ? '. ' + T('Note', 'Nota') + ': ' + esc(c.reason) : '') + '</p></section>';
+    }
+    return '<section class="card x-close' + (low.length ? ' edge' : '') + '"><div class="cardhead"><h3>' + T('Close the night', 'Cerrar la noche') + '</h3><span class="count">' + pct + '% \u00b7 ' + T('target', 'meta') + ' ' + TARGET + '%</span></div>' +
+      '<ul class="plist" style="list-style:none;margin:0 0 8px;padding:0">' + rows + '</ul>' +
+      '<p class="status"><b>' + iceLine(T, opts.es()) + '</b></p>' +
+      (low.length ? '<p class="status">' + T('Under ' + TARGET + '% on ' + low.length + (low.length === 1 ? ' list' : ' lists') + '. Finish them, or write one line about why and close anyway.', 'Menos de ' + TARGET + '% en ' + low.length + (low.length === 1 ? ' lista' : ' listas') + '. Term\u00ednalas, o escribe una l\u00ednea de por qu\u00e9 y cierra de todos modos.') + '</p>' +
+        '<div class="padd"><input type="text" id="x-close-why" placeholder="' + T('Why is it under ' + TARGET + '%?', '\u00bfPor qu\u00e9 qued\u00f3 bajo ' + TARGET + '%?') + '" autocomplete="off" style="flex:1 1 200px;width:auto"></div>' : '<p class="status">' + T('Everything is above ' + TARGET + '%. Sign it off.', 'Todo est\u00e1 arriba de ' + TARGET + '%. F\u00edrmala.') + '</p>') +
+      '<div class="padd"><button type="button" class="btn primary" data-xclose="1">' + T('Close the night', 'Cerrar la noche') + '</button></div></section>';
+  }
+  function closeNight(opts) {
+    var d = opts.date(), info = opts.lists(d), tot = 0, dn = 0;
+    info.forEach(function (l) { tot += l.n; dn += l.done; });
+    var pct = tot ? Math.round(100 * dn / tot) : 0, low = info.filter(function (l) { return l.n && Math.round(100 * l.done / l.n) < TARGET; });
+    var why = document.getElementById('x-close-why'), reason = why ? why.value.trim() : '';
+    if (low.length && !reason) { if (why) { why.focus(); why.style.borderColor = 'var(--cherry,#8B1E1E)'; } return; }
+    var names = opts.names();
+    function go(n) {
+      var rec = { by: n || '', at: Date.now(), pct: pct, lists: info.map(function (l) { return [l.name, l.done, l.n]; }), reason: reason || null };
+      opts.save(d, rec);
+    }
+    if (names.length > 1) askWho(names, opts.t('Who is closing?', '\u00bfQui\u00e9n cierra?'), function (n) { if (n) go(n); });
+    else go(names[0] || '');
+  }
+  /* Ice machine: one shared switch both boards see (e86/icemachine, in the collection the boards already share).
+     Whoever turns it on or off taps the matching button, so anyone can see its state, who changed it and when. */
+  function iceState() { return (S.ice && typeof S.ice.on === 'boolean') ? S.ice : null; }
+  function iceLine(T, es) {
+    var x = iceState(); if (!x) return T('Ice machine: not logged yet', 'M\u00e1quina de hielo: sin registro');
+    var when = new Date(x.at).toLocaleString(es ? 'es-MX' : 'en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+    return T('Ice machine', 'M\u00e1quina de hielo') + ': ' + (x.on ? T('ON', 'PRENDIDA') : T('OFF', 'APAGADA')) + ' \u00b7 ' + esc(x.by || '?') + ', ' + when;
+  }
+  function iceCard(T, es) {
+    var x = iceState(), on = x && x.on;
+    var when = x ? new Date(x.at).toLocaleString(es ? 'es-MX' : 'en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : '';
+    var log = x && x.log ? Object.keys(x.log).sort().reverse().slice(1, 4).map(function (k) { var l = x.log[k]; return (l.on ? T('on', 'prendida') : T('off', 'apagada')) + ' \u00b7 ' + esc(l.by || '?') + ' \u00b7 ' + new Date(+k).toLocaleString(es ? 'es-MX' : 'en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' }); }).join('<br>') : '';
+    return '<section class="card x-ice ' + (x ? (on ? 'on' : 'off') : '') + '"><div class="cardhead"><h3>' + T('Ice machine', 'M\u00e1quina de hielo') + '</h3>' +
+      '<span class="x-ice-st">' + (x ? (on ? T('ON', 'PRENDIDA') : T('OFF', 'APAGADA')) : T('Not logged', 'Sin registro')) + '</span></div>' +
+      (x ? '<p class="status">' + T((on ? 'Turned on' : 'Turned off') + ' by', (on ? 'Prendida' : 'Apagada') + ' por') + ' <b>' + esc(x.by || '?') + '</b>, ' + when + '</p>' : '<p class="status">' + T('Tap the button when you turn it on or off, so everyone knows its state.', 'Toca el bot\u00f3n cuando la prendas o apagues, para que todos sepan c\u00f3mo est\u00e1.') + '</p>') +
+      '<div class="padd"><button type="button" class="btn' + (on ? '' : ' primary') + '" data-ice="on">' + T('I turned it ON', 'La prend\u00ed') + '</button><button type="button" class="btn' + (x && !on ? '' : ' primary') + '" data-ice="off">' + T('I turned it OFF', 'La apagu\u00e9') + '</button></div>' +
+      (log ? '<p class="status" style="margin-top:6px">' + T('Before that', 'Antes') + ':<br>' + log + '</p>' : '') + '</section>';
+  }
+  function iceSet(on, n, saver) {
+    var at = Date.now(), rec = { on: on, by: n || '', at: at, log: {} }; rec.log[at] = { on: on, by: n || '' };
+    S.ice = Object.assign({}, S.ice, { on: on, by: n || '', at: at, log: Object.assign({}, (S.ice && S.ice.log) || {}, rec.log) });
+    saver('e86/icemachine', rec);
+  }
+  var ICE_CSS = '.x-ice .x-ice-st{font:800 20px var(--f-head,var(--f-body,system-ui));letter-spacing:.04em;padding:4px 14px;border-radius:999px;border:2px solid var(--line,#ccc)}' +
+    '.x-ice.on .x-ice-st{color:var(--good,#1F6B3A);border-color:var(--good,#1F6B3A)}.x-ice.off .x-ice-st{color:var(--cherry,#8B1E1E);border-color:var(--cherry,#8B1E1E)}.x-ice .padd .btn{min-height:48px;font-size:16px}';
+  var CLOSE_CSS = ICE_CSS + '.x-close.done{border-color:var(--good,#1F6B3A)}.x-close.done .count{color:var(--good,#1F6B3A)}';
+  /* Staff page: the roster in two columns, BOH (Kitchen) and FOH (everyone else), instead of one long list. */
+  function rosterCols() {
+    var ul = document.querySelector('ul.rlist'); if (!ul || ul.closest('.x-roster')) return;
+    var lis = Array.prototype.slice.call(ul.children);
+    var boh = lis.filter(function (li) { var g = li.querySelector('.ptag'), r = li.querySelector('.rr'); return (g && /kitchen|cocina/i.test(g.textContent)) || (r && /cook|cocin|dish|prep|chef|kitchen/i.test(r.textContent)); }), foh = lis.filter(function (li) { return boh.indexOf(li) < 0; });
+    var wrap = document.createElement('div'); wrap.className = 'grid x-roster';
+    [['FOH', foh], ['BOH', boh]].forEach(function (col) {
+      var d = document.createElement('div'); d.innerHTML = '<h4 class="x-rh">' + col[0] + ' <span>' + col[1].length + '</span></h4>';
+      var u = document.createElement('ul'); u.className = ul.className; col[1].forEach(function (li) { u.appendChild(li); }); d.appendChild(u); wrap.appendChild(d);
+    });
+    ul.replaceWith(wrap);
+  }
+  /* Every card folds open and shut (Eric, Nov 8 2026). Each board draws plain cards; after every draw each one that has a
+     title becomes a fold, keeping its header (counts, names, buttons). Whether a card is open is remembered on this device,
+     per board, page and title. Cards start open, except the Roster. Left alone: the sign-in row, cards inside the menu
+     and drinks book, pop-up panels, and cards that are already folds. */
+  var FOLD_KEY = 'vicio_folds';
+  function foldGet() { try { return JSON.parse(localStorage.getItem(FOLD_KEY) || '{}') || {}; } catch (e) { return {}; } }
+  function foldSet(k, v) { var s2 = foldGet(); s2[k] = v; try { localStorage.setItem(FOLD_KEY, JSON.stringify(s2)); } catch (e) {} }
+  function foldStaff() {
+    var view = document.getElementById('view'); if (!view) return;
+    var st = foldGet();
+    view.querySelectorAll('section.card, div.card').forEach(function (sec) {
+      if (sec.classList.contains('x-signin') || sec.classList.contains('pview') || sec.closest('.pview, .pbook, .plist2, #x86-modal, details, #vo')) return;
+      var head = sec.querySelector(':scope > .cardhead'), h = head ? head.querySelector('h2, h3') : sec.querySelector(':scope > h2, :scope > h3');
+      /* Cards with the header one level down (BOH 90-day plan: week label beside the body) fold on that inner header. */
+      var pre = null;
+      if (!h) { head = sec.querySelector(':scope > div > .cardhead'); h = head ? head.querySelector('h2, h3') : null; if (h) pre = sec.querySelector(':scope > .phase-when'); }
+      if (!h) return;
+      var title = ((h.firstChild && h.firstChild.nodeType === 3 ? h.firstChild.textContent : h.textContent) || '').trim();
+      var role = sec.querySelector('.rlist, .x-roster') || /^roster$/i.test(title) ? 'roster' : null;
+      var key = BOARD + ':' + (ui.tab || '') + ':' + (role || title.toLowerCase());
+      var d = document.createElement('details'); d.className = sec.className + ' fold x-sfold'; d.dataset.sfold = role || 'card';
+      if (sec.id) d.id = sec.id;
+      if (st[key] == null ? role !== 'roster' : st[key]) d.open = true;
+      var sum = document.createElement('summary'), sp = document.createElement('span'); sp.className = 'cardhead';
+      if (pre) { var pw = document.createElement('span'); pw.className = 'x-pre'; pw.textContent = pre.firstChild ? pre.firstChild.textContent : pre.textContent; sp.appendChild(pw); }
+      if (head) { while (head.firstChild) sp.appendChild(head.firstChild); head.remove(); } else sp.appendChild(h);
+      if (!sp.querySelector('.count')) { var cn = document.createElement('span'); cn.className = 'count'; sp.appendChild(cn); }
+      sum.appendChild(sp); d.appendChild(sum); while (sec.firstChild) d.appendChild(sec.firstChild);
+      d.addEventListener('toggle', function () { foldSet(key, d.open); });
+      sec.replaceWith(d);
+    });
+  }
+  /* A tap on a button, link or box inside a fold's header does its job without opening or closing the fold. */
+  document.addEventListener('click', function (e) {
+    var sm = e.target.closest && e.target.closest('details.x-sfold > summary'); if (!sm) return;
+    var ctl = e.target.closest('button, a, input, select, textarea, label'); if (!ctl || !sm.contains(ctl)) return;
+    var d = sm.parentNode, was = d.open; setTimeout(function () { if (d.open !== was) d.open = was; }, 0);
+  }, true);
+  var SFOLD_CSS = 'details.x-sfold.phase{display:block}details.x-sfold.phase>summary h3{margin-right:auto}details.x-sfold.phase>.phase-when{display:none}.x-sfold .x-pre{font:700 12px var(--f-mono,monospace);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-right:4px}.x-sfold>summary h3{margin:0}.x-sfold[open]>summary{margin-bottom:10px}.x-sfold>summary .cardhead{flex-wrap:wrap}';
+  var ROSTER_CSS = SFOLD_CSS + '.x-roster{margin:4px 0 12px}.x-roster .x-rh{margin:0 0 6px;font:700 13px var(--f-mono,monospace);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}.x-roster .x-rh span{font-weight:400}.x-roster ul{margin:0}';
+  /* Sign-in as one compact row: a pull-down of the roster (own side first), Someone else opens a name box.
+     People already signed in on this device show as small chips with an x. attr is data-fwho (FOH) or data-xwho (BOH). */
+  function whoRow(T, attr, title, signed, ppl) {
+    var opts = '<option value="">' + (signed.length ? T('Add someone\u2026', 'Agregar a alguien\u2026') : T('Pick your name\u2026', 'Elige tu nombre\u2026')) + '</option>' +
+      ppl.map(function (p) { return '<option value="' + esc(p.name) + '">' + esc(p.name) + '</option>'; }).join('') +
+      '<option value="__other">' + T('Someone else\u2026', 'Otra persona\u2026') + '</option>';
+    return '<section class="card x-signin x-compact"><div class="x-row"><b class="x-lbl">' + title + '</b>' +
+      '<select ' + attr + '-sel="1" aria-label="' + title + '">' + opts + '</select>' +
+      '<input type="text" id="' + attr.slice(5) + '-txt" class="x-other" placeholder="' + T('Name', 'Nombre') + '" autocomplete="off" autocapitalize="words" hidden>' +
+      '<button type="button" class="btn primary x-other" ' + attr + '="in" hidden>' + T('Add', 'Agregar') + '</button>' +
+      signed.map(function (n) { return '<span class="x-tag">' + esc(n) + '<button type="button" class="btn x" ' + attr + '="rm" data-name="' + esc(n) + '" aria-label="' + T('Remove', 'Quitar') + ' ' + esc(n) + '">\u00d7</button></span>'; }).join('') +
+      (signed.length ? '<button type="button" class="btn" ' + attr + '="done">' + T('Done', 'Listo') + '</button>' : '') + '</div></section>';
+  }
+  function whoSel(e, attr, add) {
+    var sel = e.target; if (!sel || !sel.hasAttribute || !sel.hasAttribute(attr + '-sel')) return false;
+    var v = sel.value, row = sel.closest('.x-row');
+    if (v === '__other') { row.querySelectorAll('.x-other').forEach(function (x) { x.hidden = false; }); var t = row.querySelector('input.x-other'); if (t) t.focus(); return true; }
+    if (v) add(v);
+    return true;
+  }
+  var COMPACT_CSS = '.x-compact{padding:10px 14px}.x-compact .x-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.x-compact .x-lbl{font-size:15px;margin-right:4px}' +
+    '.x-compact select{min-height:44px;font-size:16px;padding:8px 10px;border-radius:10px;border:1px solid var(--line,#ccc);background:var(--surface,#fff);color:var(--ink,#18181B);flex:1 1 200px;max-width:320px}' +
+    '.x-compact input.x-other{min-height:44px;flex:1 1 160px;max-width:240px}';
+  var WHO_CSS = COMPACT_CSS + CLOSE_CSS + ROSTER_CSS + WHO2_CSS + '.x-who{margin-left:auto;font:600 12px var(--f-body,system-ui);color:var(--cherry,#8B1E1E);background:var(--cherry-soft,rgba(139,30,30,.1));border:1px solid currentColor;border-radius:999px;padding:4px 10px;min-height:28px;cursor:pointer;white-space:nowrap}.x-who::before{content:"\u25CF ";font-size:9px;vertical-align:1px}.cardhead{flex-wrap:wrap;gap:6px}';
+  /* FOH: who is on this device, and their initials on everything they tick. The FOH board already saves the name with each
+     tick and clears the sign-in at the next shift; this puts the sign-in on Today and Checklists and shows initials. */
+  if (BOARD === 'foh') {
+    (function fohStart() {
+      if (typeof VIEWS === 'undefined' || typeof render !== 'function' || typeof save !== 'function' || typeof S === 'undefined' ||
+          typeof ui === 'undefined' || typeof window.setWho !== 'function' || typeof whoName !== 'function') return setTimeout(fohStart, 200);
+      var fes = function () { return ui.lang === 'es'; }, ft = function (a, b) { return fes() ? b : a; };
+      /* Standards added after a rough weekend (Nov 1 2026). New sections go at the end of each list so the ids of the
+         existing items, and the ticks already saved against them, stay put. */
+      if (typeof LISTS !== 'undefined' && LISTS.bar_open && !LISTS.bar_open.some(function (s) { return s[0] === 'Before doors open'; })) {
+        LISTS.bar_open.push(['Before doors open', [
+          'Margaritas batched to par for the night, labeled and dated',
+          'Ice wells full at open',
+          'Phones away. No sitting or eating at the bar. Slow moment? Prep or restock']]);
+        /* The 9 PM ice top-off before the 10 PM rush now lives on the Host / Busser mid shift list (foh.html, host_mid). */
+        LISTS.bar_close.push(['Set up tomorrow', [
+          'Margarita batch level noted so the opener knows how much to batch']]);
+        LISTS.host_open.push(['Before doors open', [
+          'Cold beer stocked in the storage fridge from the backups',
+          'Napkins stocked in the expo window. Backups are in the attic',
+          'Phones away. No sitting or eating on the floor or at the bar. Slow moment? Prep, restock, or detail']]);
+        LISTS.host_close.push(['Set up tomorrow', [
+          'Cold beer restocked in the storage fridge for tomorrow',
+          'Expo window napkins restocked from the attic backups']]);
+        LISTS.host_close.push(['Restrooms after close', [
+          'Women\u2019s restroom: quick look, no big mess left for the hotel. We don\u2019t clean or stock it',
+          'Men\u2019s restroom: quick look, no big mess left for the hotel. We don\u2019t clean or stock it']]);
+      }
+      /* Restrooms are the hotel's to clean (Eric, Nov 8 2026). The busser only takes a quick look that they are in order, so
+         nothing is left in bad shape for the hotel crew after an incident. Same items, same ids, new words. */
+      var RR = { W: 'Women\u2019s restroom: quick look, no big mess left for the hotel. We don\u2019t clean or stock it', M: 'Men\u2019s restroom: quick look, no big mess left for the hotel. We don\u2019t clean or stock it' };
+      /* No bus tubs: dishes go on the cart and the kitchen handles them. Reservation and waitlist notes are not a busser job. */
+      var BUS = 'Dirty dishes on the cart; the kitchen handles them from there';
+      ['host_mid', 'host_close'].forEach(function (k) { (LISTS[k] || []).forEach(function (sec) { sec[1] = sec[1].map(function (x) { return typeof x !== 'string' ? x : /^Women\u2019s restroom checked/.test(x) ? RR.W : /^Men\u2019s restroom checked/.test(x) ? RR.M : /^Bus tubs emptied/.test(x) ? BUS : x; }); }); });
+      var DROP = /^(Reservation\/waitlist notes|Waitlist and reservations checked)/i;
+      if (typeof sections === 'function' && !sections.__drop) {
+        var secD = sections;
+        sections = function (key, d) { return secD(key, d).map(function (sc) { return [sc[0], sc[1].filter(function (it) { return !DROP.test(it[1]); })].concat(sc.slice(2)); }).filter(function (sc) { return sc[1].length; }); };
+        sections.__drop = true;
+      }
+      if (typeof ES === 'object' && ES) { ES[RR.W] = 'Ba\u00f1o de mujeres: un vistazo, que no quede un gran desorden para el hotel. No lo limpiamos ni surtimos'; ES[RR.M] = 'Ba\u00f1o de hombres: un vistazo, que no quede un gran desorden para el hotel. No lo limpiamos ni surtimos'; ES[BUS] = 'Platos sucios al carrito; la cocina se encarga de ellos'; ES['Restrooms after close'] = 'Ba\u00f1os despu\u00e9s del cierre'; }
+      try { (typeof TRACKS !== 'undefined' ? TRACKS : []).forEach(function (tr) { (tr.quiz || []).forEach(function (q) {
+        if (q.en && /restrooms mid shift/.test(q.en[0])) { q.en[1][1] = 'A quick look for a big mess. The hotel cleans and stocks it'; q.es[1][1] = 'Un vistazo por si hay un gran desorden. El hotel lo limpia y surte'; }
+      }); }); } catch (e) {}
+      /* Special event nights (a buyout or ticketed event booked on Catering & Events): security and a door person. */
+      var EV_SEC = LISTS && LISTS.host_open ? LISTS.host_open.length : 99;
+      function eventNight(d) {
+        try { return Object.values(S.orders || {}).some(function (o) { return o && o.date === d && (o.type === 'buyout' || o.type === 'ticketed') && ['deposit', 'confirmed', 'done'].indexOf(o.status) >= 0; }); } catch (e) { return false; }
+      }
+      if (typeof sections === 'function' && !sections.__ev) {
+        var sec0 = sections;
+        sections = function (key, d) {
+          var out = sec0(key, d);
+          if (key === 'host_open' && eventNight(d)) out.push(['Special event tonight', [
+            ['host_open_' + EV_SEC + '_0', 'Security guard on site and checked in before doors', false],
+            ['host_open_' + EV_SEC + '_1', 'Door person at the door all night (IDs, guest list or tickets)', false]]]);
+          return out;
+        };
+        sections.__ev = true;
+      }
+      function ini(n) { var w = String(n || '').trim().split(/\s+/).filter(Boolean); if (!w.length) return ''; return (w.length === 1 ? w[0].slice(0, 2) : w[0][0] + w[w.length - 1][0]).toUpperCase(); }
+      function fquick(path, patch) {
+        if (typeof db === 'undefined' || !db || !db.doc) return save(path, patch);
+        if (typeof setStatus === 'function') setStatus('Saving');
+        return db.doc(path).update(patch).then(function () { if (typeof setStatus === 'function') setStatus('Saved', 'ok'); },
+          function () { if (typeof setStatus === 'function') setStatus('Not saved. Check your access and try again.', 'bad'); });
+      }
+      /* Everyone signed in on this device for the service day. The FOH board's own single sign-in is kept as the first name. */
+      function fnames() {
+        try { var x = JSON.parse(localStorage.getItem('vicio_foh_names') || 'null'); if (x && x.date === svcDate() && Array.isArray(x.names)) return x.names; } catch (e) {}
+        var n = whoName(); return n ? [n] : [];
+      }
+      function setNames(arr) {
+        arr = arr.filter(function (n, i) { return n && arr.indexOf(n) === i; });
+        try { localStorage.setItem('vicio_foh_names', JSON.stringify({ names: arr, date: svcDate() })); } catch (e) {}
+        ui.whoEdit = false;
+        window.setWho(arr[0] || '');
+      }
+      function card() {
+        var names = fnames();
+        if (names.length && !ui.whoEdit) return '';
+        var ppl = typeof stPeople === 'function' ? stPeople() : [];
+        ppl = ppl.filter(function (p) { return p.group !== 'Kitchen'; }).concat(ppl.filter(function (p) { return p.group === 'Kitchen'; })).filter(function (p) { return names.indexOf(p.name) < 0; });
+        var on = typeof shiftsOn === 'function' ? shiftsOn(svcDate()).map(function (w) { return w.name; }) : [];
+        ppl = ppl.filter(function (p) { return on.indexOf(p.name) >= 0; }).concat(ppl.filter(function (p) { return on.indexOf(p.name) < 0; }));
+        return whoRow(ft, 'data-fwho', names.length ? ft('On this device', 'En este aparato') : ft('Who is on tonight?', '\u00bfQui\u00e9n est\u00e1 esta noche?'), names, ppl);
+      }
+      var byDocs = {}, watched = {};
+      function byFor(path) {
+        if (S.shift && path === 'shifts/' + ui.date) return S.shift.by || {};
+        if (!watched[path] && typeof watchDoc === 'function' && typeof db !== 'undefined' && db) {
+          watched[path] = 1; watchDoc(path, function (d) { byDocs[path] = (d && d.by) || {}; annotate(); });
+        }
+        return byDocs[path] || {};
+      }
+      function annotate() {
+        document.querySelectorAll('input[data-chk]:checked').forEach(function (inp) {
+          var p = inp.dataset.chk.split('|'), name = byFor(p[0])[p[1]], lab = inp.closest('label');
+          if (!lab || !name || lab.querySelector('.x-by')) return;
+          var sm = document.createElement('small'); sm.className = 'x-by'; sm.textContent = ini(name); sm.title = name;
+          (lab.querySelector('span') || lab).appendChild(sm);
+        });
+      }
+      var st = document.createElement('style');
+      st.textContent = '.x-by{display:inline-block;margin-left:8px;padding:1px 7px;letter-spacing:.04em;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font:600 11px var(--f-body,system-ui)}.byline{display:none!important}.x-signin .chips .btn{min-height:44px;font-size:16px}.x-tag{display:inline-flex;align-items:center;gap:4px;padding:4px 6px 4px 12px;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font-weight:600}.x-tag .btn.x{min-height:30px;padding:0 8px}' + WHO_CSS;
+      document.head.appendChild(st);
+
+      /* Expo on the Training page: what runs out with each dish, and the table numbers. The run matrix is a starting draft
+         from the menu; managers edit it on the board and it is stored in the shared sheet at expo/matrix. Table numbers come
+         from the Reservations floor plan (seating/layout), so they always match the map. */
+      var EXPO_DEF = [
+        ['Any pizza', '1 plate per guest, pizza spatula, napkins. Parm and chile flake shakers if the table has none'],
+        ['Seasoned Waffle Fries', 'Ketchup'],
+        ['Garlic Bread', 'Red sauce on the side'],
+        ['Green Chile Mozz Sticks', 'Red sauce on the side'],
+        ['Fried Pickles', 'Ranch'],
+        ['Buffalo Baddies', 'Ranch, extra napkins'],
+        ['Wings', 'Ranch, wet naps, empty plate for bones, extra napkins'],
+        ['The Side Chicks', 'Fries and ranch come on it. Extra napkins'],
+        ['Chicken sandwiches (Basic, La Toxica, Bad Chick)', 'Fries and ranch come on it. Steak knife, napkins'],
+        ['Online pickup order', 'Bag, napkins, plates and forks if asked, sauces on the ticket']];
+      function expoRows() { var m = S.expo && S.expo.rows; return Array.isArray(m) && m.length ? m : EXPO_DEF; }
+      function expoCard() {
+        var ed = typeof mgr === 'function' && mgr(), rows = expoRows(), editing = ed && ui.expoEdit;
+        var body = editing
+          ? rows.map(function (r, i) { return '<div class="padd" style="margin:4px 0"><input type="text" data-expo="' + i + '|0" value="' + esc(r[0]) + '" style="flex:1 1 160px;width:auto"><input type="text" data-expo="' + i + '|1" value="' + esc(r[1]) + '" style="flex:2 1 240px;width:auto"><button type="button" class="btn x" data-expo-del="' + i + '" aria-label="Remove">\u00d7</button></div>'; }).join('') +
+            '<div class="padd" style="margin-top:8px"><button type="button" class="btn" data-expo-add="1">' + ft('Add a dish', 'Agregar platillo') + '</button><button type="button" class="btn primary" data-expo-save="1">' + ft('Save', 'Guardar') + '</button></div>'
+          : '<div class="tablewrap"><table style="min-width:0"><thead><tr><th>' + ft('When this goes out', 'Cuando sale esto') + '</th><th>' + ft('Run it with', 'Ll\u00e9valo con') + '</th></tr></thead><tbody>' +
+            rows.map(function (r) { return '<tr><td><b>' + esc(r[0]) + '</b></td><td>' + esc(r[1]) + '</td></tr>'; }).join('') + '</tbody></table></div>';
+        return '<section class="card" id="x-expo"><div class="cardhead"><h3>' + ft('Expo: what runs with what', 'Expo: qu\u00e9 se lleva con qu\u00e9') + '</h3>' +
+          (ed ? '<button type="button" class="btn" data-expo-edit="1">' + (editing ? ft('Cancel', 'Cancelar') : ft('Edit', 'Editar')) + '</button>' : '') + '</div>' +
+          (S.expo && S.expo.rows ? '' : '<p class="status">' + ft('Starting draft from the menu. A manager confirms it with Edit.', 'Borrador inicial del men\u00fa. Un gerente lo confirma con Editar.') + '</p>') +
+          '<p class="status">' + ft('Every plate leaves the window with what it needs. Check the ticket for extra sauces before you walk.', 'Cada plato sale de la ventana con lo que necesita. Revisa el ticket por salsas extra antes de caminar.') + '</p>' + body + '</section>';
+      }
+      function tablesCard(folded) {
+        var list = (S.layout && S.layout.tables) || [], areas = ['Inside', 'Bar', 'Patio'];
+        var by = areas.map(function (a) { return [a, list.filter(function (t) { return t.area === a; }).sort(function (x, y) { return String(x.n).localeCompare(String(y.n), undefined, { numeric: true }); })]; }).filter(function (g) { return g[1].length; });
+        var inner = by.length ? by.map(function (g) {
+          return '<div style="margin:6px 0"><div class="status" style="font-weight:700;text-transform:uppercase;letter-spacing:.08em">' + esc(g[0]) + '</div><div class="chips">' +
+            g[1].map(function (t) { return '<span class="x-tag" style="padding:6px 12px;font-size:17px">' + esc(t.n) + (t.seats ? ' <small style="font-weight:400">\u00b7 ' + t.seats + '</small>' : '') + '</span>'; }).join('') + '</div></div>';
+        }).join('') + '<p class="status">' + ft('Number and seats. The map with positions is on Reservations.', 'N\u00famero y lugares. El mapa con posiciones est\u00e1 en Reservaciones.') + '</p>'
+          : '<p class="status">' + ft('No tables set up yet. A manager adds them on Reservations, Floor plan; they show here and on the map.', 'A\u00fan no hay mesas. Un gerente las agrega en Reservaciones, Plano; se ven aqu\u00ed y en el mapa.') + '</p>';
+        return '<details class="card fold x-tables"' + (folded ? '' : ' open') + '><summary class="cardhead"><h3>' + ft('Table numbers', 'N\u00fameros de mesa') + '</h3><span class="count">' + list.length + '</span></summary>' + inner + '</details>';
+      }
+      S.expo = S.expo || null;
+      (function watchExpo() { if (typeof db === 'undefined' || !db) return setTimeout(watchExpo, 300); watchDoc('expo/matrix', function (d) { S.expo = d && d.rows ? d : null; if (ui.tab === 'training' && !ui.expoEdit) render(); }); })();
+      if (typeof VIEWS.training === 'function' && !VIEWS.training.__expo) {
+        var tr0 = VIEWS.training;
+        VIEWS.training = function () { var html = tr0.apply(this, arguments); return (typeof tq !== 'undefined' && tq.items && tq.items.length) || ui.trk ? html : tablesCard(false) + expoCard() + html; };
+        VIEWS.training.__expo = true;
+      }
+      ['today', 'service'].forEach(function (k) { var v = VIEWS[k]; if (typeof v === 'function' && !v.__tables) { VIEWS[k] = function () { return v.apply(this, arguments) + iceCard(ft, fes()) + tablesCard(true); }; VIEWS[k].__tables = true; } });
+      (function watchIce() { if (typeof db === 'undefined' || !db) return setTimeout(watchIce, 300); watchDoc('e86/icemachine', function (d) { S.ice = d || null; render(); }); })();
+      document.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('[data-ice]'); if (!b) return; e.preventDefault(); e.stopImmediatePropagation();
+        var on = b.dataset.ice === 'on', nm = fnames();
+        if (nm.length > 1) askWho(nm, ft('Who turned it ' + (on ? 'on' : 'off') + '?', '\u00bfQui\u00e9n la ' + (on ? 'prendi\u00f3' : 'apag\u00f3') + '?'), function (n) { if (n) { iceSet(on, n, fquick); render(); } });
+        else { iceSet(on, nm[0] || '', fquick); render(); }
+      }, true);
+      var expoDraft = null;
+      document.addEventListener('input', function (e) { var x = e.target; if (!x.dataset || !x.dataset.expo) return; var p = x.dataset.expo.split('|'); expoDraft = expoDraft || expoRows().map(function (r) { return r.slice(); }); expoDraft[+p[0]][+p[1]] = x.value; });
+      document.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('[data-expo-edit],[data-expo-add],[data-expo-del],[data-expo-save]'); if (!b) return;
+        e.preventDefault(); e.stopImmediatePropagation();
+        if (b.dataset.expoEdit) { ui.expoEdit = !ui.expoEdit; expoDraft = null; render(); return; }
+        expoDraft = expoDraft || expoRows().map(function (r) { return r.slice(); });
+        if (b.dataset.expoAdd) { expoDraft.push(['', '']); S.expo = { rows: expoDraft }; render(); return; }
+        if (b.dataset.expoDel) { expoDraft.splice(+b.dataset.expoDel, 1); S.expo = { rows: expoDraft }; render(); return; }
+        var rows = expoDraft.filter(function (r) { return (r[0] || '').trim(); });
+        S.expo = { rows: rows }; save('expo/matrix', { rows: rows, by: fnames()[0] || '', at: Date.now() }); ui.expoEdit = false; expoDraft = null; render();
+      }, true);
+      /* The progress strip at the top of Today: Opening, Mid shift and Closing, across both roles. */
+      if (typeof shiftBar === 'function' && !shiftBar.__mid && typeof ROLES !== 'undefined') {
+        shiftBar = function (d, done) {
+          var seg = function (phase, label) {
+            var parts = Object.keys(ROLES).map(function (r) { var it = LISTS[r + '_' + phase] ? flat(r + '_' + phase, d) : []; return [ROLES[r], cnt(it, done), it.length]; }).filter(function (x) { return x[2]; });
+            var n = parts.reduce(function (a, p) { return a + p[1]; }, 0), tt = parts.reduce(function (a, p) { return a + p[2]; }, 0), p = pctOf(n, tt), left = parts.filter(function (x) { return x[1] < x[2]; }).map(function (x) { return x[0] + ' ' + x[1] + '/' + x[2]; });
+            var col = p >= 90 ? 'var(--good,#4CC38A)' : p >= 50 ? 'var(--warn,#F0A43A)' : 'var(--bad,#E5484D)';
+            return '<div class="seg ' + (p === 100 ? 'done' : '') + '"><div class="segbar"><i style="width:' + p + '%;background:' + col + '"></i></div><div class="seghead"><b>' + label + '</b><span>' + (p === 100 ? ft('Done', 'Listo') : n + ft(' of ', ' de ') + tt) + '</span></div>' +
+              '<p class="segleft">' + (p === 100 ? ft('All clear.', 'Todo listo.') : n ? ft('Left: ', 'Faltan: ') + esc(left.join(', ')) : ft('Nothing yet.', 'Nada a\u00fan.')) + '</p></div>';
+          };
+          return '<div class="shiftbar">' + seg('open', ft('Opening', 'Apertura')) + seg('mid', ft('Mid shift', 'Medio turno')) + seg('close', ft('Closing', 'Cierre')) + '</div>';
+        };
+        shiftBar.__mid = true;
+      }
+      var closeOpts = {
+        t: ft, es: fes, date: svcDate, names: fnames,
+        lists: function (d) { var dn = (S.shift && ui.date === d ? S.shift.done : null) || {}; return ['host_open', 'host_mid', 'host_close', 'bar_open', 'bar_mid', 'bar_close'].filter(function (k) { return LISTS[k]; }).map(function (k) { var items = sections(k, d).flatMap(function (s) { return s[1]; }); return { name: (k.indexOf('host') === 0 ? 'Host / Busser ' : 'Bartender ') + ({ open: 'open', mid: 'mid shift', close: 'close' })[k.split('_')[1]], n: items.length, done: items.filter(function (x) { return dn[x[0]]; }).length }; }); },
+        closed: function (d) { return S.xclose && S.xclose[d]; },
+        save: function (d, rec) { S.xclose = S.xclose || {}; S.xclose[d] = rec; fquick('closeout/' + d, rec); render(); }
+      };
+      S.xclose = S.xclose || {};
+      ['today', 'lists'].forEach(function (k) { var v = VIEWS[k]; if (typeof v === 'function') VIEWS[k] = function () { return card() + v.apply(this, arguments) + closeCard(closeOpts); }; });
+      (function watchClose() { if (typeof db === 'undefined' || !db) return setTimeout(watchClose, 300); watchDoc('closeout/' + svcDate(), function (x) { S.xclose = S.xclose || {}; S.xclose[svcDate()] = x && x.at ? x : null; render(); }); })();
+      document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-xclose]'); if (!b) return; e.preventDefault(); e.stopImmediatePropagation(); closeNight(closeOpts); }, true);
+      /* Today: the Lists card in two columns, Host / Busser on the left and Bartender on the right, open, mid shift and
+         close in order down each side; Notes for the next shift sits beside the Night report. Rearranged after each draw,
+         so the board's own page stays as it is. */
+      function todayLayout() {
+        if (ui.tab !== 'today' || ui.mode === 'service') return;
+        var lr = document.querySelector('#view .lrows');
+        if (lr && !lr.classList.contains('x-split')) {
+          var rows = Array.prototype.slice.call(lr.querySelectorAll('.lrow'));
+          var col = function (side, label) { var c = document.createElement('div'); c.className = 'x-lcol'; c.innerHTML = '<h4 class="x-rh">' + label + '</h4>'; rows.filter(function (b) { return b.dataset.v === side; }).forEach(function (b) { c.appendChild(b); }); return c; };
+          lr.classList.add('x-split'); lr.appendChild(col('host', ft('Host / Busser', 'Host / Busser'))); lr.appendChild(col('bar', ft('Bartender', 'Bartender')));
+        }
+        /* Tight header on Today (Eric, Nov 8): row 1 is Checklists / Service with Opening, Mid shift and Closing at the right;
+           row 2 is TONIGHT with the date and Back / Next beside it. The eyebrow and the paragraph are dropped here. */
+        var sb = document.querySelector('#view .shiftbar'), hd = document.getElementById('head'), sw = hd && hd.querySelector('.modesw'), bar = document.querySelector('#view > .bar'), h1 = hd && hd.querySelector('h1');
+        if (sb && sw) { sb.classList.add('x-top'); hd.classList.add('x-tight'); sw.appendChild(sb); }
+        if (bar && h1) { var tr = document.createElement('div'); tr.className = 'x-titlerow'; h1.parentNode.insertBefore(tr, h1); tr.appendChild(h1); bar.classList.add('x-hbar'); tr.appendChild(bar); }
+        /* On tonight: one line of first names and times instead of a long list, with the sign-in pull-down inside the same
+           card, so who is on and who is signed in take one small box. */
+        var onCard = Array.prototype.slice.call(document.querySelectorAll('#view .grid.today > section.card')).find(function (c) { var h = c.querySelector('h3'); return h && /^On (tonight|[A-Z][a-z]+day)$/.test(h.textContent.trim()); });
+        if (onCard && !onCard.classList.contains('x-on')) {
+          onCard.classList.add('x-on');
+          var ul = onCard.querySelector('ul.plain');
+          if (ul) {
+            var p = document.createElement('p'); p.className = 'x-onl';
+            p.innerHTML = Array.prototype.slice.call(ul.children).map(function (li) { var b = li.querySelector('b'), m = li.querySelector('.muted'), tt = m ? (m.textContent.split('\u00b7')[1] || '').trim() : ''; return '<span><b>' + esc(b ? b.textContent : li.textContent) + '</b>' + (tt ? ' ' + esc(tt) : '') + '</span>'; }).join('');
+            ul.replaceWith(p);
+          }
+          var sg = document.querySelector('#view .x-signin');
+          if (sg) { sg.classList.add('x-inon'); onCard.insertBefore(sg, onCard.querySelector('.nav')); }
+          else if (fnames().length) { var who = document.createElement('div'); who.className = 'x-onwho'; who.innerHTML = ft('Signed in', 'Firmado') + ': <b>' + esc(fnames().join(', ')) + '</b> <button type="button" class="btn x" data-fwho="out">' + ft('Change', 'Cambiar') + '</button>'; onCard.insertBefore(who, onCard.querySelector('.nav')); }
+        }
+        var nt = document.querySelector('#view details[data-fold="notes"]'), nr = document.querySelector('#view details[data-fold="night"]');
+        if (nt && nr && !nt.parentNode.classList.contains('x-pair')) { var g = document.createElement('div'); g.className = 'grid x-pair'; nr.parentNode.insertBefore(g, nr); g.appendChild(nt); g.appendChild(nr); }
+      }
+      /* Schedule page for staff: Events near downtown is read-only (no add, remove or find), and Draft next week's
+         schedule is gone. Both stay whole for the manager PIN (the store's role) and on Colette's Board, since adding events
+         and drafting the schedule are admin work. The board's own mgr() is true for everyone, so it can't be used here. */
+      var adm = function () { try { return !!window.__vicioInline || (window.VicioStore && VicioStore.role && VicioStore.role() === 'manager'); } catch (e) { return false; } };
+      if (typeof vEvents === 'function' && !vEvents.__ro) {
+        var ev0 = vEvents;
+        vEvents = function (days) {
+          if (adm()) return ev0(days);
+          var all = days.flatMap(function (k) { return evOn(k); }), byDay = days.map(function (k) { return [k, evOn(k)]; }).filter(function (x) { return x[1].length; });
+          return fold('events', ft('Events near downtown', 'Eventos cerca del centro'), all.length ? all.length + ft(' in two weeks', ' en dos semanas') : ft('None listed', 'Ninguno'),
+            '<p class="status">' + ft('Suns, Mercury, D-backs, concerts, festivals and conventions nearby. Expect a rush before and after.', 'Suns, Mercury, D-backs, conciertos, festivales y convenciones cerca. Espera m\u00e1s gente antes y despu\u00e9s.') + '</p>' +
+            (byDay.length ? byDay.map(function (x) { return '<p class="grp">' + esc(longDate(x[0])) + '</p><ul class="checks plist">' + x[1].map(function (e) { return '<li><span class="ptime">' + esc(e.time || '') + '</span><span><b>' + esc(e.title) + '</b> <span class="muted">' + esc(e.venue || '') + '</span>' + (e.impact ? ' <span class="pill warn">' + esc(e.impact) + '</span>' : '') + '</span></li>'; }).join('') + '</ul>'; }).join('') : '<p class="status">' + ft('Nothing listed for these two weeks.', 'Nada en estas dos semanas.') + '</p>'));
+        };
+        vEvents.__ro = true;
+      }
+      if (typeof vSuggest === 'function' && !vSuggest.__mgr) {
+        var sg0 = vSuggest;
+        vSuggest = function (days) { return adm() ? sg0(days) : ''; };
+        vSuggest.__mgr = true;
+      }
+      /* Menu page, food: a simple card like BOH. Photo, what it is, how to sell it, and what Expo sends with it (from the
+         Expo matrix on Training, so a manager's edit there shows here too). The sell lines are a starting draft. */
+      var SELL = {
+        'Margherita': 'The cleanest way to taste our crust: crispy cheese edges, bright red sauce, fresh basil. A great first pizza, or a cool one next to something spicy.',
+        'The Mixtape': 'Can\u2019t decide? Half Margherita, half Pepperoni in one pan. Best pick for a table sharing one pizza.',
+        'Pepperoni': 'Our best seller. The pepperoni cups up and crisps on top, with crispy cheese edges all around.',
+        'Sausage and Pep': 'Pepperoni plus spicy sausage for the meat lovers. Let them know it has a little kick.',
+        'Triple Pepperoni': 'Half a pound of cupping pepperoni. For the pepperoni lover at the table.',
+        'El Infierno': 'Our hottest pie: Scorpion hot honey over pepperoni with cool ricotta. Warn them it is very spicy, then let them be brave.',
+        'La Pi\u00f1a Brava': 'Sweet and spicy: roasted pineapple, roasted jalape\u00f1os, pepperoni and hot honey. Pineapple fans love it.',
+        'La G\u00fcera': 'No red sauce. Garlic parm butter, spicy sausage and ricotta. Rich, for guests who want something different.',
+        'Buffalo Chicken Pizza': 'No red sauce. Crispy chicken, buffalo, gorgonzola and ranch. Like wings on a pizza.',
+        'La Cochina': 'House favorite. Carnitas, pickled onions, queso fresco and salsa macha. Mention the salsa macha has sesame.',
+        'Build Your Own Pizza': 'Start with red sauce and mozzarella and add what they love. Meats +$2, premium meats +$4, toppings +$1.50.',
+        'Seasoned Waffle Fries': 'An easy add for the table while the pizza bakes.',
+        'Garlic Bread': 'Half a pizza base with garlic parm butter and red sauce for dipping. A great starter for two.',
+        'Green Chile Mozz Sticks': 'House made and giant, stuffed with green chile. Three to an order, made for sharing.',
+        'Fried Pickles': 'Hand breaded spears with ranch. Crunchy and salty, perfect with a beer.',
+        'Buffalo Baddies': 'Boneless buffalo bites with ranch. Easy to share, no mess.',
+        'Wings': 'Six bone-in wings in their pick of flavor. Ask which flavor; check with the kitchen for tonight\u2019s list.',
+        'The Side Chicks': 'Three crispy tenders with fries and ranch. The safe pick for kids and picky eaters.',
+        'The Basic Chick Sandwich': 'Crispy chicken thigh, slaw, pickles and buffalo on a sweet bun, with fries.',
+        'La Toxica': 'Our spicy sandwich: extra spicy thigh and roasted jalape\u00f1os. Warn them it is hot.',
+        'The Bad Chick': 'Two crispy thighs stacked. The big one, for real hunger.'
+      };
+      function expoFor(name, group) {
+        var rows = expoRows(), n = name.toLowerCase();
+        var hit = rows.find(function (r) { return r[0].toLowerCase() === n; }) || rows.find(function (r) { return r[0].toLowerCase().indexOf(n) >= 0; });
+        if (!hit && /^pizzas|build your own/i.test(group || '')) hit = rows.find(function (r) { return /pizza/i.test(r[0]) && /any/i.test(r[0]); });
+        if (!hit && /sandwich|toxica|bad chick/i.test(name)) hit = rows.find(function (r) { return /sandwich/i.test(r[0]); });
+        return hit ? hit[1] : '';
+      }
+      var tagPill = function (tg) { return tg ? '<span class="pill ' + (/spicy/i.test(tg) ? 'warn' : /House favorite|Featured/.test(tg) ? 'good' : 'none') + '">' + esc(tg) + '</span>' : ''; };
+      if (typeof foodPreview === 'function' && !foodPreview.__simple) {
+        foodPreview = function (name) {
+          var grp = '', row = null;
+          MENU.forEach(function (x) { x[2].forEach(function (r) { if (r[0] === name) { row = r; grp = x[0]; } }); });
+          if (!row) return '';
+          var g = GUEST[name], img = g ? kitPhoto(g.id) : null, desc = (g && g.sum) || row[3] || '', sell = SELL[name] || '', ex = expoFor(name, grp);
+          var sec = function (h, b) { return b ? '<div class="rsec"><p class="grp">' + h + '</p><p style="font-size:17px;line-height:1.45;margin:0">' + esc(b) + '</p></div>' : ''; };
+          return (img ? '<img class="pimg" src="' + img + '" alt="' + esc(name) + '">' : '<div class="x-noimg">' + ft('No photo yet', 'Sin foto todav\u00eda') + '</div>') +
+            '<div class="cardhead"><h3 style="font-size:24px">' + esc(name) + ' <span class="rp">' + esc(row[1]) + '</span></h3>' + tagPill(g ? g.tag : row[2]) + '</div>' +
+            outNote(name) +
+            (desc ? '<p class="rsum" style="font-size:17px">' + esc(desc) + '</p>' : '') +
+            sec(ft('How to sell it', 'C\u00f3mo venderlo'), sell) +
+            sec(ft('Expo sends it with', 'Expo lo manda con'), ex);
+        };
+        foodPreview.__simple = true;
+      }
+      /* TV lineup: no asking and waiting. The Suggest card on Media becomes a Lineup card that shows the planned lineup for
+         the day on the date bar, with Previous night and Next night to step through the two weeks ahead. The plan lives
+         at tvplan/next {nights:[{date, tv:{f345,tv1,tv2:{show,ch}}, notes}], updated}, the same record the Coming up
+         section reads. Building it needs Claude and the browser, so only Colette's Board and the manager PIN see
+         Plan the next 2 weeks; staff only see the result. */
+      var TVORDER = [['f345', ft('TVs 3-5', 'TVs 3-5'), true], ['tv1', 'TV 1', false], ['tv2', 'TV 2', false]];
+      function planNights() { return ((S.tvplan && S.tvplan.nights) || []).filter(function (n) { return n && n.date; }).sort(function (a, b) { return a.date < b.date ? -1 : 1; }); }
+      function openDays(n) { var out = [], d = svcDate(); for (var i = 0; out.length < 99 && i < n; i++) { var k = addDays(d, i); if (OPEN[parse(k).getDay()]) out.push(k); } return out; }
+      function lineupCard() {
+        var nights = planNights(), d = ui.date, night = nights.find(function (n) { return n.date === d; }) || null;
+        var steps = nights.length ? nights.map(function (n) { return n.date; }) : openDays(14);
+        var prev = steps.filter(function (k) { return k < d; }).pop(), next = steps.find(function (k) { return k > d; });
+        var cur = (S.tvday && S.tvday.tv) || {}, onTv = night && TVORDER.every(function (o) { var a = (night.tv || {})[o[0]] || {}, b = cur[o[0]] || {}; return !a.show || (b.show === a.show); });
+        var body = night ? '<ul class="tvnl x-lu">' + TVORDER.map(function (o) { var v = (night.tv || {})[o[0]] || {}; return '<li><span class="tvk' + (o[2] ? ' snd' : '') + '">' + o[1] + '</span><span><b>' + esc(v.show || ft('Not set', 'Sin asignar')) + '</b>' + (v.ch ? '<span class="status">' + esc(v.ch) + '</span>' : '') + '</span></li>'; }).join('') + '</ul>' +
+            ((night.notes || []).length ? '<ul class="plain">' + night.notes.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '') +
+            '<div class="chips">' + (onTv ? '<span class="pill good">' + ft('On the TVs below', 'Ya en las TVs') + '</span>' : '<button type="button" class="btn primary" data-xlu="use">' + ft('Put this on the TVs', 'Ponerlo en las TVs') + '</button>') + '</div>' +
+            '<p class="status">' + ft('Sound goes on TVs 3-5. Check the channel before you switch: schedules change and games run long.', 'El sonido va en las TVs 3-5. Revisa el canal antes de cambiar: los horarios cambian.') + '</p>'
+          : '<p class="status">' + (OPEN[parse(d).getDay()] ? ft('No lineup planned for this night yet.', 'A\u00fan no hay programaci\u00f3n para esta noche.') : ft('Closed this day.', 'Cerrado este d\u00eda.')) + (adm() ? '' : ' ' + ft('A manager plans two weeks at a time.', 'Un gerente planea dos semanas a la vez.')) + '</p>';
+        var tools = adm() ? '<div class="chips" style="margin-top:8px"><button type="button" class="btn" data-xlu="plan"' + (ui.luBusy ? ' disabled' : '') + '>' + (ui.luBusy ? ft('Planning\u2026', 'Planeando\u2026') : ft('Plan the next 2 weeks', 'Planear 2 semanas')) + '</button><span class="status">' + esc(ui.luMsg || (S.tvplan && S.tvplan.updated ? ft('Planned ', 'Planeado ') + new Date(S.tvplan.updated).toLocaleDateString(fes() ? 'es-MX' : 'en-US', { month: 'short', day: 'numeric' }) : '')) + '</span></div>' : '';
+        return '<section class="card x-lineup' + (night ? '' : ' edge') + '"><div class="cardhead"><h3>' + ft('Lineup', 'Programaci\u00f3n') + ' <span class="lday">' + (d === svcDate() ? '<b>' + ft('Tonight', 'Hoy') + '</b> \u00b7 ' : '') + esc(fmt(d, { weekday: 'long', month: 'short', day: 'numeric' })) + '</span></h3></div>' +
+          '<div class="nav x-lunav"><button type="button" class="btn" data-xlu="go" data-d="' + (prev || '') + '"' + (prev ? '' : ' disabled') + '>\u2039 ' + ft('Previous night', 'Noche anterior') + '</button><button type="button" class="btn" data-xlu="go" data-d="' + (next || '') + '"' + (next ? '' : ' disabled') + '>' + ft('Next night', 'Siguiente noche') + ' \u203a</button></div>' +
+          body + tools + '</section>';
+      }
+      if (typeof VIEWS.sop === 'function' && !VIEWS.sop.__lu) {
+        var md0 = VIEWS.sop;
+        VIEWS.sop = function () {
+          var h = md0.apply(this, arguments), i = h.indexOf('data-fold="tvsugg"');
+          if (i < 0) return h;
+          var a = h.lastIndexOf('<details', i), b = h.indexOf('</details>', i);
+          return a < 0 || b < 0 ? h : h.slice(0, a) + lineupCard() + h.slice(b + 10);
+        };
+        VIEWS.sop.__lu = true;
+      }
+      function luUse() {
+        var night = planNights().find(function (n) { return n.date === ui.date; }); if (!night) return;
+        var tv = {}; TVORDER.forEach(function (o) { var v = (night.tv || {})[o[0]]; if (v && v.show) tv[o[0]] = { show: String(v.show), ch: String(v.ch || '') }; });
+        var patch = { tv: tv, sound: 'f345' }; S.tvday = Object.assign({}, S.tvday, patch); save('tvday/' + ui.date, patch); render();
+      }
+      async function luPlan() {
+        ui.luBusy = true; ui.luMsg = ft('Reading the schedules\u2026', 'Leyendo los horarios\u2026'); render();
+        try {
+          var c = window.claude, sample = c && c.use ? await c.use('sample') : null;
+          if (!sample) throw { message: ft('Planning needs Claude: run it from Colette\u2019s Board in the Claude app.', 'Planear necesita Claude: hazlo desde el tablero de Colette en la app de Claude.') };
+          var days = openDays(14), pages = '', mcp = c.use ? await c.use('mcp').catch(function () { return null; }) : null;
+          if (mcp) for (var u = 0; u < SPORT_PAGES.length; u++) {
+            try {
+              var r = await mcp.callTool('host:claude_browser', 'preview_start', { url: SPORT_PAGES[u] }), tabId = r && r.payload && (r.payload.tabId || (typeof r.payload === 'string' ? r.payload : null));
+              await new Promise(function (x) { setTimeout(x, 2500); });
+              var tx = await mcp.callTool('host:claude_browser', 'get_page_text', tabId ? { tabId: tabId, max_chars: 15000 } : { max_chars: 15000 });
+              pages += '\n\n=== ' + SPORT_PAGES[u] + ' ===\n' + (tx && tx.payload ? (typeof tx.payload === 'string' ? tx.payload : JSON.stringify(tx.payload)) : '').slice(0, 15000);
+              if (tabId) mcp.callTool('host:claude_browser', 'tabs_close', { tabId: tabId }).catch(function () {});
+            } catch (e) {}
+          }
+          if (!pages) throw { message: ft('Could not open the schedule pages. Run this in the Claude desktop app.', 'No se pudieron abrir los horarios. Hazlo en la app de Claude de escritorio.') };
+          ui.luMsg = ft('Picking the lineups\u2026', 'Eligiendo la programaci\u00f3n\u2026'); render();
+          var nightsIn = days.map(function (k) { return { date: k, day: DAYN[parse(k).getDay()], hours: OPEN[parse(k).getDay()] }; });
+          var out = await sample.json('You plan the TVs for Vicio, a Detroit style pizza and cocktail bar in downtown Phoenix, Arizona, with a Latin crowd and a DJ on weekends. Plan every open night below. All times Arizona time (MST, no daylight saving). Only pick games live or starting during that night\u2019s hours. Priority: 1) Phoenix teams (Suns, Cardinals, Diamondbacks, Mercury, ASU, Arizona Wildcats, Phoenix Rising); 2) the biggest national games; 3) Liga MX, Mexico national team, big boxing and UFC; 4) other live games. Three feeds: f345 is shown on TVs 3, 4 and 5 and is the only one with sound, so it gets the biggest game; tv1 and tv2 face the dining room. Never invent a game: use only games in the schedule pages. If a night has nothing listed yet, leave its shows empty and add a note \"Check listings that week\". Put the start time in the show text, like \"Suns vs Lakers, 7 PM\". Nights: ' + JSON.stringify(nightsIn) + '. Schedule pages: ' + pages.slice(0, 80000) + '\nAnswer with JSON only: {"nights":[{"date":"YYYY-MM-DD","tv":{"f345":{"show":"","ch":""},"tv1":{"show":"","ch":""},"tv2":{"show":"","ch":""}},"notes":["at most 2 short notes"]}]}', { modelTier: 'default', cache: false });
+          var ok = {}; days.forEach(function (k) { ok[k] = 1; });
+          var nights = ((out && out.nights) || []).filter(function (n) { return n && ok[n.date]; }).map(function (n) {
+            var tv = {}; TVORDER.forEach(function (o) { var v = (n.tv || {})[o[0]] || {}; tv[o[0]] = { show: String(v.show || '').slice(0, 70), ch: String(v.ch || '').slice(0, 40) }; });
+            return { date: n.date, tv: tv, notes: (n.notes || []).slice(0, 2).map(function (x) { return String(x).slice(0, 160); }) };
+          });
+          if (!nights.length) throw { message: ft('Claude did not return a plan. Try again in a minute.', 'Claude no devolvi\u00f3 un plan. Intenta en un minuto.') };
+          var keep = planNights().filter(function (n) { return !ok[n.date] && n.date >= svcDate(); });
+          var rec = { nights: keep.concat(nights).sort(function (a, b) { return a.date < b.date ? -1 : 1; }), updated: Date.now() };
+          S.tvplan = rec; save('tvplan/next', rec);
+          ui.luMsg = ft('Planned ' + nights.length + ' nights.', nights.length + ' noches planeadas.');
+        } catch (e) { ui.luMsg = (e && e.code === 'not_granted') ? ft('Allow Claude for this page first.', 'Permite Claude en esta p\u00e1gina primero.') : (e && e.message) || ft('Could not plan the lineups.', 'No se pudo planear.'); }
+        ui.luBusy = false; render();
+      }
+      document.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('[data-xlu]'); if (!b) return; e.preventDefault(); e.stopImmediatePropagation();
+        if (b.dataset.xlu === 'go' && b.dataset.d) { ui.date = b.dataset.d; S.shift = {}; if (typeof subShiftTo === 'function') subShiftTo(ui.date); render(); }
+        else if (b.dataset.xlu === 'use') luUse();
+        else if (b.dataset.xlu === 'plan' && !ui.luBusy && adm()) luPlan();
+      }, true);
+      var LAYOUT_CSS = '#head .lede,#head .eyebrow{display:none}#head h1{margin-bottom:10px}#head .modesw{margin-bottom:8px}' + /* iPad: every page starts with just its title (Eric, Nov 8). */ '#head.x-tight .lede,#head.x-tight .eyebrow{display:none}#head.x-tight .modesw{margin-bottom:6px;align-items:flex-start}#head.x-tight .modesw>.status{align-self:center}@media (max-width:1200px){#head.x-tight .modesw>.status{display:none}}.x-titlerow .x-hbar>.count{display:none}' +
+        '.modesw .shiftbar.x-top{margin-left:auto;flex:1 1 330px;max-width:620px;gap:12px}.shiftbar.x-top .segbar{height:14px}.shiftbar.x-top .seghead{flex-wrap:wrap;gap:0 8px}.shiftbar.x-top .seghead b,.shiftbar.x-top .seghead span{white-space:nowrap}.shiftbar.x-top .segleft{font-size:12px;line-height:1.3;margin:0}' +
+        '.x-titlerow{display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;margin:0 0 14px}.x-titlerow h1{margin:0;line-height:1}.x-titlerow .x-hbar{flex:1 1 360px;margin:0}' + '.x-onl{display:flex;flex-wrap:wrap;gap:4px 14px;margin:2px 0 6px;font-size:14.5px}.x-onl span{white-space:nowrap}.x-onl b{font-weight:700}.x-on .x-signin.x-inon{border:0;padding:6px 0 0;margin:0;background:none;box-shadow:none}.x-on .x-inon .x-lbl{display:none}.x-onwho{font-size:14px;margin:2px 0 6px}.x-onwho .btn.x{min-height:32px;margin-left:6px}' + '.x-lunav{display:flex;gap:8px;margin:4px 0 10px}.x-lunav .btn{flex:1;min-height:44px}.x-lineup .lday{font-weight:400;font-size:15px;margin-left:6px}.x-lu{margin:0 0 8px}' + '.x-noimg{display:grid;place-items:center;height:120px;border:1px dashed var(--line,#ccc);border-radius:12px;color:var(--muted);font-size:14px;margin-bottom:10px}' + '.lrows.x-split{grid-template-columns:1fr 1fr;align-items:start;gap:14px}.x-lcol{display:grid;gap:8px;min-width:0}.x-lcol .x-rh{margin:0 0 2px}@media (max-width:640px){.lrows.x-split{grid-template-columns:1fr}}.x-pair{align-items:start}.x-pair>details{align-self:start;margin:0}';
+      var st2 = document.createElement('style'); st2.textContent = LAYOUT_CSS + '.x-rh{font:700 13px var(--f-mono,monospace);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}'; document.head.appendChild(st2);
+      var r0 = render;
+      render = function () { r0.apply(this, arguments); try { todayLayout(); rosterCols(); foldStaff(); annotate(); nameChips(fnames().join(' + '), 'data-fwho', ft('Tap to add or switch people', 'Toca para agregar o cambiar personas')); } catch (e) {} };
+      /* A tap and the name go out together, at once, so a box never flips back while it saves. */
+      function saveTick(path, id, on, nm) {
+        var patch = { done: {} }; patch.done[id] = on;
+        if (nm || !on) { patch.by = {}; patch.by[id] = on ? nm : null; byDocs[path] = Object.assign({}, byDocs[path] || {}, patch.by); }
+        fquick(path, patch);
+        if (S.shift && path === 'shifts/' + ui.date && patch.by) S.shift.by = Object.assign({}, S.shift.by || {}, patch.by);
+        if (typeof markListDone === 'function') markListDone(path, id, on);
+        if (typeof maybeAutoReport === 'function') maybeAutoReport(path, id, on);
+        setTimeout(annotate, 0);
+      }
+      document.addEventListener('change', function (e) {
+        var inp = e.target; if (!inp || !inp.dataset || !inp.dataset.chk) return;
+        e.stopImmediatePropagation();
+        var parts = inp.dataset.chk.split('|'), path = parts[0], id = parts[1], names = fnames();
+        if (inp.checked && names.length > 1) {
+          askWho(names, ft('Who did this?', '\u00bfQui\u00e9n lo hizo?'), function (n) { if (!n) { inp.checked = false; return; } saveTick(path, id, true, n); });
+          return;
+        }
+        saveTick(path, id, inp.checked, names[0] || '');
+      }, true);
+      document.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('[data-fwho]'); if (!b) return;
+        e.preventDefault(); e.stopImmediatePropagation();
+        var names = fnames();
+        if (b.dataset.fwho === 'pick') { setNames(names.concat([b.dataset.name])); }
+        else if (b.dataset.fwho === 'rm') { setNames(names.filter(function (n) { return n !== b.dataset.name; })); ui.whoEdit = true; render(); }
+        else if (b.dataset.fwho === 'out') { ui.whoEdit = true; render(); }
+        else if (b.dataset.fwho === 'done') { ui.whoEdit = false; render(); }
+        else { var x = document.getElementById('fwho-txt'); if (!x || !x.value.trim()) { if (x) x.focus(); return; } setNames(names.concat([x.value.trim()])); }
+      }, true);
+      document.addEventListener('change', function (e) { if (whoSel(e, 'data-fwho', function (n) { setNames(fnames().concat([n])); })) e.stopImmediatePropagation(); }, true);
+      document.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target && e.target.id === 'fwho-txt' && e.target.value.trim()) { e.preventDefault(); setNames(fnames().concat([e.target.value.trim()])); } });
+      /* 9 PM ice alert: a banner and a chime until the 9 PM top-off (Host / Busser mid shift) is ticked; red and chiming again after 9:15. */
+      var ICE_ID = (function () { var L = (LISTS.host_mid || []); for (var si = 0; si < L.length; si++) { var ii = L[si][1].findIndex(function (x) { return /^9 PM: top off/.test(x); }); if (ii >= 0) return 'host_mid_' + si + '_' + ii; } return 'host_mid_1_0'; })();
+      runAlerts([{
+        key: 'ice', at: '21:00', late: '21:15', until: '23:00',
+        text: ft('9 PM: top off all the ice before the 10 PM rush', '9 PM: rellena todo el hielo antes de la hora pico de las 10'),
+        lateText: ft('(running late)', '(ya va tarde)'), doneText: ft('Ice is topped off', 'Hielo listo'), laterText: ft('10 more minutes', '10 minutos m\u00e1s'), whoText: ft('Who topped off the ice?', '\u00bfQui\u00e9n rellen\u00f3 el hielo?'),
+        applies: function (d) { return true; },
+        done: function (d) { return !!(S.shift && S.shift.done && S.shift.done[ICE_ID] && ui.date === d); },
+        mark: function (d, n) { saveTick('shifts/' + d, ICE_ID, true, n); if (S.shift && ui.date === d) { S.shift.done = Object.assign({}, S.shift.done, { [ICE_ID]: true }); } render(); }
+      }], svcDate, fnames);
+      render();
+    })();
+    return;
+  }
+  if (BOARD !== 'kitchen') return;
+  document.title = 'Vicio BOH';
+
+  function ready() { return typeof VIEWS !== 'undefined' && typeof render === 'function' && typeof save === 'function' && typeof S !== 'undefined' && typeof ui !== 'undefined'; }
+  function es() { return typeof lang === 'function' ? lang() === 'es' : false; }
+  function t(en, esx) { return es() ? esx : en; }
+  /* Everyone signed in on this device. ui.by stays the first name for the board's own logs. */
+  function names() { try { var x = JSON.parse(localStorage.getItem('vicio_by') || 'null'); if (Array.isArray(x)) return x.filter(Boolean); if (typeof x === 'string') return [x]; } catch (e) {} var s = ''; try { s = localStorage.getItem('vicio_by') || ''; } catch (e) {} return s ? [s] : []; }
+  function who() { return names()[0] || ''; }
+  /* Saves a tap straight to the store, without waiting behind earlier taps, so each one is protected on screen at once. */
+  function quick(path, patch) {
+    if (typeof db === 'undefined' || !db || !db.doc) return save(path, patch);
+    if (typeof setStatus === 'function') setStatus('Saving');
+    return db.doc(path).update(patch).then(function () { if (typeof setStatus === 'function') setStatus('Saved', 'ok'); },
+      function () { if (typeof setStatus === 'function') setStatus('Not saved. Check your access and try again.', 'bad'); });
+  }
+  function setNames(arr) {
+    arr = arr.map(function (n) { return String(n || '').trim(); }).filter(function (n, i) { return n && arr.indexOf(n) === i; });
+    ui.by = arr[0] || '';
+    try { if (arr.length) localStorage.setItem('vicio_by', JSON.stringify(arr)); else localStorage.removeItem('vicio_by'); } catch (e) {}
+    ui.whoEdit = false; render();
+  }
+  function setWho(n) { setNames(n ? [n] : []); }
+
+
+  /* Recipe cards from recipes.js go into their group on the Recipes page; esx holds the Spanish card. */
+  var REMOVED_RECIPES = ['nm505', 'asadafries'];  /* Nuevo Mexico 505, Carne Asada Fries */
+  function addRecipes() {
+    if (typeof BOOK === 'undefined' || !Array.isArray(BOOK)) return;
+    BOOK.forEach(function (g) { g.items = g.items.filter(function (i) { return REMOVED_RECIPES.indexOf(i.id) < 0; }); });
+    if (typeof RECIPES !== 'undefined' && Array.isArray(RECIPES)) RECIPES.forEach(function (g) { g[1] = g[1].filter(function (x) { return REMOVED_RECIPES.indexOf(x[0]) < 0; }); });
+    if (REMOVED_RECIPES.indexOf(ui.rSel) >= 0) ui.rSel = null;
+    (window.VICIO_RECIPES || []).forEach(function (pair) {
+      var g = BOOK.find(function (x) { return x.name === pair[0]; }) || BOOK[0];
+      if (!BOOK.some(function (x) { return x.items.some(function (i) { return i.id === pair[1].id; }); })) g.items.push(pair[1]);
+    });
+    if (typeof recDetail === 'function' && !recDetail.__esx) {
+      var rd0 = recDetail;
+      recDetail = function (x) { return withPhoto(x, rd0(x && x.esx && es() ? Object.assign({}, x, x.esx) : x)); };
+      recDetail.__esx = true;
+    }
+    if (typeof render === 'function' && ui.tab === 'recipes') render();
+  }
+  window.__vicioAddRecipes = addRecipes;
+  /* Food photo on each recipe page, between Notes and Food cost. Stored per recipe at rphotos/<id> (the same record the
+     training recipe cards use), shrunk to about 1000 px. Managers add, replace or remove it; everyone sees it. */
+  var photoLoading = {}, photoChecked = {};
+  function withPhoto(x, html) {
+    if (!x || !x.id || typeof PHOTO === 'undefined') return html;
+    var id = x.id, img = PHOTO[id], ed = typeof isEditor === 'function' ? isEditor() : false;
+    /* Look again every 20 seconds while a recipe has no photo, so one saved from another device shows up without a reload. */
+    if (!img && !photoLoading[id] && typeof getDoc === 'function' && Date.now() - (photoChecked[id] || 0) > 20000) {
+      photoLoading[id] = 1; photoChecked[id] = Date.now();
+      getDoc('rphotos/' + id).then(function (d) { var v = (d && d.img) || null, changed = v !== PHOTO[id]; PHOTO[id] = v; photoLoading[id] = 0; if (changed) render(); }, function () { photoLoading[id] = 0; });
+    }
+    if (!img && !ed) return html;
+    var block = '<div class="rsec x-photo"><p class="grp">' + t('Photo', 'Foto') + '</p>' +
+      (img ? '<img src="' + img + '" alt="' + esc(x.name) + '" loading="lazy" style="display:block;width:100%;max-width:640px;border-radius:12px">' : '') +
+      (ed ? '<div class="chips" style="margin-top:10px"><label class="btn" style="cursor:pointer">' + (img ? t('Replace photo', 'Cambiar foto') : t('Add photo', 'Agregar foto')) +
+        '<input type="file" accept="image/*" data-photo="' + esc(id) + '" style="position:absolute;width:1px;height:1px;opacity:0"></label>' +
+        (img ? '<button type="button" class="btn x" data-act="phdel" data-id="' + esc(id) + '">' + t('Remove photo', 'Quitar foto') + '</button>' : '') + '</div>' : '') + '</div>';
+    var mark = '<div class="rsec"><p class="grp">Food cost</p>', i = html.indexOf(mark);
+    return i >= 0 ? html.slice(0, i) + block + html.slice(i) : html + block;
+  }
+  /* recipes.js lives beside this file on GitHub; on Colette's Board it is inlined, so the load is skipped there. */
+  if (!window.VICIO_RECIPES && !window.__vicioInline) { try { var rs = document.createElement('script'); rs.src = 'recipes.js?v=1'; document.head.appendChild(rs); } catch (e) {} }
+
+  /* Extra prep. A menu of standard items sits at the bottom of the Prep list; tapping one puts it on today's list at the top.
+     Stored at prepextra/board as {items:{id:{name, by, at, done:{date:true}}}, days:{date:{id:true}}}, shared by every BOH phone and Colette.
+     Anyone can add from the menu or take an item off today; adding a brand new item to the menu, or removing one, is for managers. */
+  function xpItems() {
+    var it = (S.xprep && S.xprep.items) || {};
+    return Object.keys(it).map(function (id) { var x = it[id]; return x && x.name ? Object.assign({ id: id }, x) : null; })
+      .filter(Boolean).sort(function (a, b) { return (a.at || 0) - (b.at || 0); });
+  }
+  function xpDay() { return ui.prepDate || (typeof iso === 'function' ? iso(new Date()) : ''); }
+  function xpToday() { var d = xpDay(); return ((S.xprep && S.xprep.days) || {})[d] || {}; }
+  function xpEd() { return typeof isEditor === 'function' ? isEditor() : true; }
+  function xpRecipe(name) {
+    if (typeof BOOK === 'undefined') return null;
+    return BOOK.flatMap(function (g) { return g.items; }).find(function (r) { return r.name.toLowerCase() === name.toLowerCase(); }) || null;
+  }
+  function xpCard() {
+    var d = xpDay(), on = xpToday(), items = xpItems().filter(function (x) { return on[x.id]; });
+    if (!items.length) return '';
+    var nDone = items.filter(function (x) { return x.done && x.done[d]; }).length;
+    var rows = items.map(function (x) {
+      var rec = xpRecipe(x.name);
+      return '<li><label><input type="checkbox" data-xprep="' + esc(x.id) + '"' + (x.done && x.done[d] ? ' checked' : '') + '><span><b>' + esc(x.name) + '</b></span></label>' +
+        '<span class="pneed">' + t('Extra', 'Extra') + '</span>' +
+        (rec ? '<button type="button" class="btn x" data-act="recipe" data-id="' + esc(rec.id) + '">' + t('Recipe', 'Receta') + '</button>' : '') +
+        '<button type="button" class="btn x" data-xprep-off="' + esc(x.id) + '" aria-label="' + t('Take off today', 'Quitar de hoy') + '">\u00d7</button></li>';
+    }).join('');
+    return '<section class="card edge x-prep"><div class="cardhead"><h3>Extra prep</h3><span class="count">' + nDone + ' ' + t('of', 'de') + ' ' + items.length + '</span></div>' +
+      '<ul class="checks plist">' + rows + '</ul></section>';
+  }
+  /* Square tiles with a line icon for the extra prep menu (Eric, Nov 1 2026). The icon is picked from the item's name. */
+  var XP_ICONS = {
+    jar: '<path d="M8 3h8v3H8z"/><path d="M7 6h10l1 3v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9z"/><path d="M6 12h12"/>',
+    drum: '<path d="M14.5 3.5a5 5 0 0 1 3.5 8.5l-4 4-4.5-4.5 4-4a5 5 0 0 1 1-4z"/><path d="M9.5 11.5l-4 4a1.8 1.8 0 1 0 2.5 2.5l.5.5a1.6 1.6 0 1 0 2.3-2.3l-.3-.2 2-2"/>',
+    pan: '<rect x="2.5" y="8" width="15" height="9" rx="1.5"/><path d="M17.5 12.5H22"/><path d="M5.5 11h9"/>',
+    stick: '<rect x="2.5" y="8.5" width="19" height="7" rx="1.5"/><path d="M8 8.5v7"/><path d="M13 8.5v7"/>',
+    leaf: '<path d="M5 19C5 10 11 5 20 4c-.5 9-6 15-15 15z"/><path d="M5 19l9-9"/>',
+    wedge: '<path d="M3 17l14-9 4 3v6z"/><path d="M3 17h18"/><circle cx="12" cy="14" r="1"/><circle cx="16.5" cy="13" r=".8"/>',
+    fries: '<path d="M6 11h12l-1.5 10h-9z"/><path d="M8 11V4M11 11V3M14 11V4M16.5 11V6"/>',
+    bowl: '<path d="M3 11h18a9 9 0 0 1-18 0z"/><path d="M8.5 7.5c0-1.4.9-2.1 1.8-3M13 7.5c0-1.4.9-2.1 1.8-3"/>'
+  };
+  function xpIcon(name) {
+    var n = String(name || '').toLowerCase(), k = /sauce|ranch|salsa|dressing|honey|aioli|macha/.test(n) ? 'jar' : /chicken|brine|tender|thigh|wing/.test(n) ? 'drum' :
+      /dough|shell|pan\b|pans/.test(n) ? 'pan' : /butter/.test(n) ? 'stick' : /onion|jalape|veg|cilantro|basil|lettuce|pickle|pepper|tomato|lime/.test(n) ? 'leaf' :
+      /cheese|mozz|parm|ricotta|queso/.test(n) ? 'wedge' : /fries|fry/.test(n) ? 'fries' : 'bowl';
+    return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + XP_ICONS[k] + '</svg>';
+  }
+  function xpMenu() {
+    var on = xpToday(), ed = xpEd(), rest = xpItems().filter(function (x) { return !on[x.id]; });
+    var chips = rest.map(function (x) {
+      return '<div class="xp-tw"><button type="button" class="xp-tile" data-xprep-on="' + esc(x.id) + '">' + xpIcon(x.name) + '<span>' + esc(x.name) + '</span></button>' +
+        (ed && ui.xpEdit ? '<button type="button" class="xp-x" data-xprep-del="' + esc(x.id) + '" aria-label="' + t('Remove from menu', 'Quitar del men\u00fa') + '">\u00d7</button>' : '') + '</div>';
+    }).join('');
+    return '<section class="card x-prep-menu"><div class="cardhead"><h3>' + t('Add extra prep', 'Agregar prep extra') + '</h3><span class="count">' + (rest.length ? rest.length + ' ' + t('in the menu', 'en el men\u00fa') : t('All on the list', 'Todo en la lista')) + '</span></div>' +
+      '<p class="status">' + t('Tap an item to put it on today\u2019s list.', 'Toca un art\u00edculo para ponerlo en la lista de hoy.') + '</p>' +
+      (chips ? '<div class="xp-tiles">' + chips + '</div>' : '') +
+      (ed ? '<div class="padd" style="margin-top:10px"><input type="text" id="xprep-name" placeholder="' + t('New menu item', 'Nuevo art\u00edculo del men\u00fa') + '" autocomplete="off" autocapitalize="sentences">' +
+        '<button type="button" class="btn primary" data-xprep-add="1">' + t('Add to menu', 'Agregar al men\u00fa') + '</button>' +
+        '<button type="button" class="btn" data-xprep-edit="1">' + (ui.xpEdit ? t('Done editing', 'Listo') : t('Edit menu', 'Editar men\u00fa')) + '</button></div>' : '') + '</section>';
+  }
+  function xpPatch(p) { S.xprep = S.xprep || {}; save('prepextra/board', p); render(); }
+  function xpAdd() {
+    var n = document.getElementById('xprep-name'), name = ((n && n.value) || '').trim(); if (!name) { if (n) n.focus(); return; }
+    var id = typeof newId === 'function' ? newId() : 'k' + Date.now().toString(36), d = xpDay();
+    var item = { name: name, by: who() || 'BOH', at: Date.now() };
+    S.xprep.items = Object.assign({}, S.xprep.items); S.xprep.items[id] = item;
+    S.xprep.days = Object.assign({}, S.xprep.days); S.xprep.days[d] = Object.assign({}, S.xprep.days[d]); S.xprep.days[d][id] = true;
+    var p = { items: {}, days: {} }; p.items[id] = item; p.days[d] = {}; p.days[d][id] = true;
+    if (n) n.value = ''; if (document.activeElement) document.activeElement.blur();
+    xpPatch(p);
+  }
+  function xpSetDay(id, on) {
+    var d = xpDay();
+    S.xprep.days = Object.assign({}, S.xprep.days); S.xprep.days[d] = Object.assign({}, S.xprep.days[d]); S.xprep.days[d][id] = on;
+    var p = { days: {} }; p.days[d] = {}; p.days[d][id] = on; xpPatch(p);
+  }
+  function xpDel(id) {
+    S.xprep.items = Object.assign({}, S.xprep.items); delete S.xprep.items[id];
+    var p = { items: {} }; p.items[id] = null; xpPatch(p);
+  }
+  function xpTick(id, on, asName) {
+    var d = xpDay(), items = Object.assign({}, S.xprep.items);
+    if (items[id]) { items[id] = Object.assign({}, items[id], { done: Object.assign({}, items[id].done || {}) }); items[id].done[d] = on; }
+    S.xprep.items = items;
+    var nm = on ? (asName || who() || null) : null;
+    if (items[id]) { items[id].doneBy = Object.assign({}, items[id].doneBy || {}); items[id].doneBy[d] = nm; }
+    var p = { items: {} }; p.items[id] = { done: {}, doneBy: {} }; p.items[id].done[d] = on; p.items[id].doneBy[d] = nm; quick('prepextra/board', p);
+    setTimeout(annotate, 0);
+  }
+  function xpPlace() {
+    if (ui.tab !== 'prep') return;
+    var view = document.getElementById('view'); if (!view) return;
+    if (!document.querySelector('.x-prep')) { var top = xpCard(); if (top) { var bar = view.querySelector('.bar'); if (bar) bar.insertAdjacentHTML('afterend', top); else view.insertAdjacentHTML('afterbegin', top); } }
+    if (!document.querySelector('.x-prep-menu')) view.insertAdjacentHTML('beforeend', xpMenu());
+    if (typeof translateDom === 'function') translateDom();
+  }
+
+
+  /* Saturday counts, on the board instead of Typeform. Item lists live in the shared sheet at invitems/board
+     ({areas:{<area>:{name, items:[{id,name,unit,par,vendor}]}}}); managers edit them here or on Colette's board.
+     Counts go to inv/<week>_<area> ({c:{itemId:number}, done, by, at}); Colette reads them for the Sunday order. */
+  var AREAS = [['basement', 'Basement'], ['storage', 'Storage'], ['restaurant', 'Restaurant (line, reach-ins, paper)'], ['centrico', 'Centrico order count'], ['beer', 'Beer cooler']];
+  var VENDORS = ['Shamrock', 'Costco', 'Centrico', 'Other'];
+  function invItems(area) { var a = (S.invitems && S.invitems.areas && S.invitems.areas[area]) || {}; return (a.items || []).filter(function (x) { return x && x.name; }); }
+  function invDoc(area) { return (S.inv && S.inv[ui.week + '_' + area]) || {}; }
+  /* What the counts say the par should be. If the order brings each item back to par every week, weekly use is about
+     par minus the Saturday count; the suggested par is the average use over the last weeks plus a 25% cushion.
+     Needs three counted weeks. Also flags items counted at zero in two of the last four weeks. */
+  function invLearn(area, x) {
+    var hist = Object.keys(S.inv || {}).filter(function (k) { return k.slice(11) === area && k.slice(0, 10) < ui.week && S.inv[k].c && S.inv[k].c[x.id] != null && S.inv[k].c[x.id] !== ''; }).sort().slice(-6);
+    var counts = hist.map(function (k) { return +S.inv[k].c[x.id]; }), out = { zeros: counts.slice(-4).filter(function (v) { return v === 0; }).length, n: counts.length, suggest: null };
+    if (x.par != null && counts.length >= 3) { var use = counts.map(function (v) { return Math.max(0, +x.par - v); }); out.suggest = Math.ceil(use.reduce(function (a, b) { return a + b; }, 0) / use.length * 1.25); }
+    return out;
+  }
+  function invView() {
+    var sat = addDays(ui.week, 6), cur = ui.week === iso(monday(new Date())), ed = xpEd();
+    var nDone = AREAS.filter(function (a) { return invDoc(a[0]).done; }).length;
+    var cards = AREAS.map(function (a) {
+      var items = invItems(a[0]), doc = invDoc(a[0]), c = doc.c || {}, filled = items.filter(function (x) { return c[x.id] != null && c[x.id] !== ''; }).length;
+      var rows = items.map(function (x) {
+        var v = c[x.id], low = v != null && v !== '' && x.par != null && +v < +x.par, L = invLearn(a[0], x);
+        var hint = (L.suggest != null && L.suggest !== +x.par ? ' <span style="color:var(--cherry,#8B1E1E)">' + t('suggest par', 'sugerido') + ' ' + L.suggest + '</span>' : '') + (L.zeros >= 2 ? ' <span style="color:var(--cherry,#8B1E1E)">' + t('ran out ' + L.zeros + ' of the last 4 weeks', 'se acab\u00f3 ' + L.zeros + ' de las \u00faltimas 4 semanas') + '</span>' : '');
+        return '<li style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line,#ddd)"><span style="flex:1;min-width:0"><b>' + esc(x.name) + '</b>' +
+          (x.unit || x.par != null || hint ? '<small style="display:block;color:var(--muted)">' + esc([x.unit, x.par != null ? t('par', 'par') + ' ' + x.par : '', x.vendor].filter(Boolean).join(' \u00b7 ')) + hint + '</small>' : '') + '</span>' +
+          '<input type="number" inputmode="decimal" step="0.1" min="0" value="' + (v == null ? '' : esc(String(v))) + '" data-inv="' + a[0] + '|' + esc(x.id) + '" style="width:84px;text-align:center;font-size:18px;padding:8px 6px;border-radius:10px;border:1px solid var(--line,#ccc);background:var(--surface,#fff);color:var(--ink,#18181B)' + (low ? ';border-color:var(--cherry,#8B1E1E)' : '') + '" aria-label="' + esc(x.name) + '">' +
+          (ed && ui.invEdit ? '<button type="button" class="btn x" data-inv-del="' + a[0] + '|' + esc(x.id) + '" aria-label="' + t('Remove', 'Quitar') + '">\u00d7</button>' : '') + '</li>';
+      }).join('');
+      return '<section class="card' + (doc.done ? '' : ' edge') + '"><div class="cardhead"><h3>' + esc(a[1]) + '</h3>' +
+        (doc.done ? '<span class="pill good">' + t('Counted', 'Contado') + '</span>' : '<span class="count">' + filled + ' ' + t('of', 'de') + ' ' + items.length + '</span>') + '</div>' +
+        (doc.done ? '<p class="status">' + t('Counted by', 'Cont\u00f3') + ' <b>' + esc(doc.by || '?') + '</b> ' + new Date(doc.at).toLocaleString(es() ? 'es-MX' : 'en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' }) + '. ' + t('Numbers can still be fixed below.', 'Los n\u00fameros a\u00fan se pueden corregir abajo.') + '</p>' : '') +
+        (items.length ? '<ul style="list-style:none;margin:0;padding:0">' + rows + '</ul>' : '<p class="status">' + t('No items yet. A manager adds them with Edit items, or on Colette\u2019s board.', 'A\u00fan no hay art\u00edculos. Un gerente los agrega con Editar art\u00edculos, o en el tablero de Colette.') + '</p>') +
+        (ed && ui.invEdit ? '<div class="padd" style="margin-top:10px;flex-wrap:wrap"><input type="text" data-inv-new="name" placeholder="' + t('Item', 'Art\u00edculo') + '" autocomplete="off" style="flex:2 1 140px;width:auto"><input type="text" data-inv-new="unit" placeholder="' + t('Unit (case, each)', 'Unidad') + '" autocomplete="off" style="flex:1 1 90px;width:auto"><input type="number" inputmode="decimal" data-inv-new="par" placeholder="Par" style="flex:0 1 70px;width:auto"><select data-inv-new="vendor" style="flex:1 1 100px">' + VENDORS.map(function (v) { return '<option>' + v + '</option>'; }).join('') + '</select><button type="button" class="btn primary" data-inv-add="' + a[0] + '">' + t('Add', 'Agregar') + '</button></div>' : '') +
+        (items.length && !doc.done ? '<div class="padd" style="margin-top:10px"><button type="button" class="btn primary" data-inv-done="' + a[0] + '">' + t('Count done', 'Conteo listo') + '</button></div>' : '') + '</section>';
+    }).join('');
+    return '<div class="bar"><div class="nav"><button class="btn" data-act="wprev" aria-label="Previous week">Back</button>' +
+      '<div class="date">Saturday ' + esc(fmt(sat, { day: 'numeric' })) + (cur ? ' <span class="pill good">This week</span>' : '') + '</div>' +
+      '<button class="btn" data-act="wnext" aria-label="Next week">Next</button>' + (cur ? '' : '<button class="btn" data-act="wtoday">This week</button>') + '</div>' +
+      '<span class="count">' + nDone + ' ' + t('of', 'de') + ' ' + AREAS.length + ' ' + t('counted', 'contados') + '</span></div>' +
+      '<div class="standard"><span>Saturday close</span><p>' + t('Count everything, type the number next to each item, then tap Count done on each area. Partials in tenths, 0.1 to 0.9. Colette builds the Sunday order from these.', 'Cuenta todo, escribe el n\u00famero junto a cada art\u00edculo y toca Conteo listo en cada \u00e1rea. Parciales en d\u00e9cimas, 0.1 a 0.9. Colette arma el pedido del domingo con esto.') + '</p></div>' +
+      (ed ? '<div class="padd" style="margin:0 0 10px"><button type="button" class="btn" data-inv-edit="1">' + (ui.invEdit ? t('Done editing', 'Listo') : t('Edit items', 'Editar art\u00edculos')) + '</button></div>' : '') +
+      '<div class="grid">' + cards + '</div>';
+  }
+  function invSetCount(area, id, v) {
+    var k = ui.week + '_' + area; S.inv = S.inv || {}; S.inv[k] = Object.assign({}, S.inv[k]); S.inv[k].c = Object.assign({}, S.inv[k].c); S.inv[k].c[id] = v;
+    var p = { c: {} }; p.c[id] = v; quick('inv/' + k, p);
+  }
+  function invDone(area, n) {
+    var k = ui.week + '_' + area, rec = { done: true, by: n || who() || '', at: Date.now() };
+    S.inv = S.inv || {}; S.inv[k] = Object.assign({}, S.inv[k], rec); quick('inv/' + k, rec);
+    var wk = {}; wk['inv_' + area] = true; save('weeks/' + ui.week, { done: wk });
+    render();
+  }
+  function invAdd(area, card) {
+    var g = function (f) { var el = card.querySelector('[data-inv-new="' + f + '"]'); return el ? el.value.trim() : ''; }, name = g('name'); if (!name) return;
+    var item = { id: 'i' + Date.now().toString(36), name: name, unit: g('unit'), par: g('par') === '' ? null : +g('par'), vendor: g('vendor') };
+    S.invitems = S.invitems || {}; S.invitems.areas = Object.assign({}, S.invitems.areas); var a = Object.assign({ name: area }, S.invitems.areas[area]); a.items = (a.items || []).concat([item]); S.invitems.areas[area] = a;
+    var p = { areas: {} }; p.areas[area] = { name: area, items: a.items }; quick('invitems/board', p); render();
+  }
+  function invDel(area, id) {
+    S.invitems.areas[area].items = S.invitems.areas[area].items.filter(function (x) { return x.id !== id; });
+    var p = { areas: {} }; p.areas[area] = { items: S.invitems.areas[area].items }; quick('invitems/board', p); render();
+  }
+
+  /* Sign in: pick a name from the roster, kitchen first, or type one. Kept on this device until "Not me". */
+  function signin() {
+    var nm = names();
+    if (nm.length && !ui.whoEdit) return '';
+    var ppl = typeof stPeople === 'function' ? stPeople() : [];
+    ppl = ppl.filter(function (p) { return p.group === 'Kitchen'; }).concat(ppl.filter(function (p) { return p.group !== 'Kitchen'; })).filter(function (p) { return nm.indexOf(p.name) < 0; });
+    return whoRow(t, 'data-xwho', nm.length ? t('On this device', 'En este aparato') : t('Who is checking tonight?', '\u00bfQui\u00e9n est\u00e1 marcando esta noche?'), nm, ppl);
+  }
+
+  /* 86 board, shared with FOH. */
+  function list() {
+    var items = (S.e86 && S.e86.items) || {};
+    return Object.keys(items).map(function (id) { var x = items[id]; return x && x.name ? Object.assign({ id: id }, x) : null; })
+      .filter(Boolean).sort(function (a, b) { return (a.at || 0) - (b.at || 0); });
+  }
+  function card() {
+    var out = list();
+    var rows = out.map(function (x) {
+      var when = x.at ? new Date(x.at).toLocaleTimeString(es() ? 'es-MX' : 'en-US', { hour: 'numeric', minute: '2-digit' }) : '';
+      return '<li style="display:flex;align-items:center;gap:10px;padding:8px 0"><span style="flex:1;min-width:0"><b>' + esc(x.name) + '</b>' +
+        (x.note ? ' <span class="muted">' + esc(x.note) + '</span>' : '') +
+        '<small style="display:block;color:var(--muted)">' + esc([x.by, when].filter(Boolean).join(', ')) + '</small></span>' +
+        '<button type="button" class="btn x" data-x86="back" data-id="' + esc(x.id) + '">' + t('Back in', 'Ya hay') + '</button></li>';
+    }).join('');
+    return '<section class="card' + (out.length ? ' edge' : '') + '"><div class="cardhead"><h3>' + t('86 board', 'Pizarra de 86') + '</h3><span class="count">' +
+      (out.length ? out.length + ' ' + t('out', 'agotados') : t('Nothing out', 'Nada agotado')) + '</span></div>' +
+      (out.length ? '<ul class="checks plist">' + rows + '</ul>' : '<p class="status">' + t('When the kitchen or the bar runs out of something, put it here. The FOH board and Colette see it right away.', 'Cuando a la cocina o a la barra se le acabe algo, an\u00f3talo aqu\u00ed. La pizarra de FOH y Colette lo ven al instante.') + '</p>') +
+      '<div class="padd"><input type="text" id="x86-name" placeholder="' + t('What\u2019s out', 'Qué se acabó') + '" autocomplete="off" autocorrect="off">' +
+      '<input type="text" id="x86-note" placeholder="' + t('Until when, or why', 'Hasta cuándo, o por qué') + '" autocomplete="off" style="flex:1 1 120px;width:auto">' +
+      '<button type="button" class="btn primary" data-x86="add">' + t('86 it', 'Ponerlo en 86') + '</button></div></section>';
+  }
+  /* The 86 board lives behind a small button at the top right of Today; tapping it opens the list in a panel. */
+  function x86Btn() {
+    var n = list().length;
+    return '<button type="button" class="x86-btn' + (n ? ' on' : '') + '" data-x86="open" aria-label="' + t('86 board', 'Pizarra de 86') + ', ' + n + ' ' + t('out', 'agotados') + '">86' + (n ? '<b>' + n + '</b>' : '') + '</button>';
+  }
+  function x86Place() {
+    var head = document.getElementById('head'), old = document.querySelector('.x86-btn');
+    if (ui.tab !== 'today') { if (old) old.remove(); }
+    else if (head) { head.style.position = 'relative'; if (old) old.outerHTML = x86Btn(); else head.insertAdjacentHTML('beforeend', x86Btn()); }
+    var m = document.getElementById('x86-modal'), a = document.activeElement;
+    if (m && !(a && m.contains(a) && /^(INPUT|TEXTAREA)$/.test(a.tagName))) m.querySelector('.x86-body').innerHTML = card();
+  }
+  function x86Open() {
+    if (document.getElementById('x86-modal')) return;
+    var m = document.createElement('div'); m.id = 'x86-modal';
+    m.innerHTML = '<div class="x86-panel" role="dialog" aria-modal="true" aria-label="' + t('86 board', 'Pizarra de 86') + '"><button type="button" class="x86-x" data-x86="close" aria-label="' + t('Close', 'Cerrar') + '">\u00d7</button><div class="x86-body">' + card() + '</div></div>';
+    m.addEventListener('click', function (e) { if (e.target === m) x86Close(); });
+    document.body.appendChild(m);
+  }
+  function x86Close() { var m = document.getElementById('x86-modal'); if (m) m.remove(); }
+  function add() {
+    var n = document.getElementById('x86-name'), tn = document.getElementById('x86-note');
+    var name = ((n && n.value) || '').trim(); if (!name) { if (n) n.focus(); return; }
+    var id = typeof newId === 'function' ? newId() : 'k' + Date.now().toString(36);
+    var item = { name: name, note: ((tn && tn.value) || '').trim(), by: who() || 'BOH', at: Date.now() };
+    var items = Object.assign({}, (S.e86 && S.e86.items) || {}); items[id] = item;
+    S.e86 = Object.assign({}, S.e86, { items: items });
+    var p = {}; p[id] = item; save('e86/board', { items: p });
+    if (n) n.value = ''; if (tn) tn.value = '';
+    if (document.activeElement) document.activeElement.blur();
+    render();
+  }
+  function back(id) {
+    var items = Object.assign({}, (S.e86 && S.e86.items) || {}); delete items[id];
+    S.e86 = Object.assign({}, S.e86, { items: items });
+    var p = {}; p[id] = null; save('e86/board', { items: p });
+    render();
+  }
+
+  /* Bylines: initials of whoever ticked each item, on every list that has checkboxes: shift checklists, cleaning,
+     week and month lists, the prep list and extra prep. Names are saved beside each tick (a by map on the same record). */
+  function initials(n) {
+    var w = String(n || '').trim().split(/\s+/).filter(Boolean);
+    if (!w.length) return '';
+    return (w.length === 1 ? w[0].slice(0, 2) : w[0][0] + w[w.length - 1][0]).toUpperCase();
+  }
+  var byDocs = {}, watched = {};
+  function byFor(path) {
+    if (S.shift && path === 'shifts/' + ui.date) return S.shift.by || {};
+    if (!watched[path] && typeof watchDoc === 'function' && typeof db !== 'undefined' && db) {
+      watched[path] = 1;
+      watchDoc(path, function (d) { byDocs[path] = (d && d.by) || {}; annotate(); });
+    }
+    return byDocs[path] || {};
+  }
+  function pill(inp, name) {
+    var lab = inp.closest('label'); if (!lab || !name || lab.querySelector('.x-by')) return;
+    var sm = document.createElement('small'); sm.className = 'x-by'; sm.textContent = initials(name); sm.title = name;
+    (lab.querySelector('span') || lab).appendChild(sm);
+  }
+  function annotate() {
+    document.querySelectorAll('input[data-chk]:checked').forEach(function (inp) {
+      var p = inp.dataset.chk.split('|'); pill(inp, byFor(p[0])[p[1]]);
+    });
+    document.querySelectorAll('input[data-pdone]:checked').forEach(function (inp) {
+      var d = inp.dataset.pdate || ui.prepDate || iso(new Date()); pill(inp, (((S.prep || {})[d] || {}).by || {})[inp.dataset.pdone]);
+    });
+    document.querySelectorAll('input[data-xprep]:checked').forEach(function (inp) {
+      var x = ((S.xprep && S.xprep.items) || {})[inp.dataset.xprep]; pill(inp, x && x.doneBy && x.doneBy[xpDay()]);
+    });
+  }
+
+  function start() {
+    if (!ready()) return setTimeout(start, 200);
+    addRecipes();
+    /* Pizzas staged for the rush (Eric, Nov 1 2026). Added at the end of the opening list so earlier items keep their ids. */
+    if (typeof OPENLIST !== 'undefined' && OPENLIST.indexOf('4 pizzas ready to go before doors: 2 cheese, 2 pepperoni') < 0) {
+      OPENLIST.push('4 pizzas ready to go before doors: 2 cheese, 2 pepperoni', '4 backup pans in the fridge with dough and cheese, ready to top');
+    }
+    /* Dough schedule: ovens on at 5:30 PM, 30 minutes before each 6 PM bake (Eric, Nov 1 2026). Ticks are saved by
+       position, so the new step carries its own key ('ovens') and the existing steps keep their original positions. */
+    if (typeof djobs === 'function' && !djobs.__ovens) {
+      var dj0 = djobs, dd0 = dDone;
+      djobs = function (k) {
+        var a = dj0(k).map(function (j, i) { return Object.assign({}, j, { _i: i }); });
+        var bi = a.findIndex(function (j) { return /^Bake /.test(j.job); });
+        if (bi >= 0) a.splice(bi, 0, { w: a[bi].w, when: '5:30 PM', job: 'Turn on both pizza ovens, 525 top and bottom, 30 minutes before the bake', min: '', s: 'Ovens on', _i: 'ovens' });
+        return a;
+      };
+      djobs.__ovens = true;
+      dDone = function (k, i) { var j = djobs(k)[i]; return dd0(k, j ? j._i : i); };
+      document.addEventListener('change', function (e) {
+        var t = e.target; if (!t || !t.dataset || !t.dataset.dtoggle) return;
+        var p = t.dataset.dtoggle.split('|'), j = djobs(p[0])[+p[1]];
+        if (j && String(j._i) !== p[1]) t.dataset.dtoggle = p[0] + '|' + j._i;
+      }, true);
+    }
+    /* Task wording fixes. Ids stay the same, so past checks still count. No floor mats in the kitchen. */
+    if (typeof CLEANING !== 'undefined') CLEANING.forEach(function (day) {
+      (day[3] || []).forEach(function (it) { if (it[1] === 'c_drains') it[2] = 'Scrub floor drains'; });
+      /* Tasks taken off the rotation: pizza pan buildup scrub. */
+      if (day[3]) day[3] = day[3].filter(function (it) { return ['c_pans'].indexOf(it[1]) < 0; });
+    });
+    /* Price List lives with the Admin pages (managers only), not under Inventory. */
+    if (typeof GROUPS !== 'undefined') {
+      GROUPS.forEach(function (g) { var i = g[1].indexOf('prices'); if (i >= 0 && g[0] !== 'Admin') g[1].splice(i, 1); });
+      var ag = GROUPS.find(function (g) { return g[0] === 'Admin'; });
+      if (ag && ag[1].indexOf('prices') < 0) ag[1].push('prices');
+      if (ui.tab === 'prices' && !xpEd()) ui.tab = 'today';
+      /* To Do is not used on BOH: take it off the tabs (its saved items are left alone). */
+      GROUPS.forEach(function (g) { var i = g[1].indexOf('todo'); if (i >= 0) g[1].splice(i, 1); });
+      for (var gi = GROUPS.length - 1; gi >= 0; gi--) if (GROUPS[gi][0] !== 'Admin' && !GROUPS[gi][1].length) GROUPS.splice(gi, 1);
+      if (ui.tab === 'todo') ui.tab = 'today';
+    }
+    var st = document.createElement('style');
+    st.textContent = '.x-by{display:inline-block;margin-left:8px;padding:1px 7px;letter-spacing:.04em;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font:600 11px var(--f-body,system-ui)}.x-signin .chips .btn{min-height:44px;font-size:16px}' + WHO_CSS +
+      '.x-tag{display:inline-flex;align-items:center;gap:4px;padding:4px 6px 4px 12px;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font-weight:600}.x-tag .btn.x{min-height:30px;padding:0 8px}' +
+      '.x86-btn{position:absolute;top:0;right:0;display:inline-flex;align-items:center;gap:6px;font:700 15px var(--f-head,var(--f-body,system-ui));letter-spacing:.02em;min-height:40px;padding:6px 14px;border-radius:999px;border:1px solid var(--line,#ccc);background:var(--surface,#fff);color:var(--ink,#18181B);cursor:pointer}' +
+      '.x86-btn b{display:inline-grid;place-items:center;min-width:22px;height:22px;padding:0 6px;border-radius:999px;background:var(--cherry,#8B1E1E);color:var(--cherry-ink,#fff);font-size:12px}' +
+      '.x86-btn.on{border-color:var(--cherry,#8B1E1E);color:var(--cherry,#8B1E1E)}#head h1{padding-right:84px}' +
+      '#x86-modal{position:fixed;inset:0;z-index:9000;display:flex;align-items:flex-start;justify-content:center;padding:max(60px,env(safe-area-inset-top,0px)) 16px 16px;background:rgba(24,24,27,.55)}' +
+      '.x86-panel{position:relative;width:min(100%,520px);max-height:calc(100vh - 90px);overflow:auto;border-radius:14px}.x86-panel .card{margin:0}' +
+      '.x86-x{position:absolute;top:10px;right:10px;z-index:1;width:36px;height:36px;border-radius:999px;border:1px solid var(--line,#ccc);background:var(--surface,#fff);color:var(--ink,#18181B);font-size:20px;line-height:1;cursor:pointer}.x86-panel .cardhead{padding-right:44px}' +
+      /* Side-by-side cards: a folded card shrinks to its title instead of stretching to its neighbour's height. */
+      '.grid>details.fold{align-self:start}' +
+      '.xp-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}@media (min-width:700px){.xp-tiles{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}}' +
+      '.xp-tw{position:relative}.xp-tile{appearance:none;width:100%;aspect-ratio:1;max-height:118px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px 8px;border:1px solid var(--line,#ccc);border-radius:14px;background:var(--surface,#fff);color:var(--ink,#18181B);cursor:pointer;font:600 13px/1.2 var(--f-body,system-ui);text-align:center;transition:background .2s,border-color .2s}' +
+      '.xp-tile svg{color:var(--cherry,#8B1E1E)}.xp-tile span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}.xp-tile:hover{border-color:var(--cherry,#8B1E1E)}' +
+      '.xp-tile.flash{background:var(--good,#1F7A4D);border-color:var(--good,#1F7A4D);color:#fff}.xp-tile.flash svg{color:#fff}' +
+      '.xp-x{position:absolute;top:-6px;right:-6px;width:28px;height:28px;border-radius:999px;border:1px solid var(--bad,#B3261E);background:var(--surface,#fff);color:var(--bad,#B3261E);font:700 16px/1 system-ui;cursor:pointer}';
+    document.head.appendChild(st);
+    S.e86 = S.e86 || {}; S.xprep = S.xprep || {}; S.inv = S.inv || {}; S.invitems = S.invitems || {};
+    if (VIEWS.inventory) VIEWS.inventory = invView;
+    var closeOpts = {
+      t: t, es: es, date: function () { return iso(new Date()); }, names: names,
+      lists: function (d) {
+        var dn = (S.shift && ui.date === d ? S.shift.done : null) || {}, out = [];
+        Object.keys(LISTS).forEach(function (pre) { var items = LISTS[pre][1](); out.push({ name: LISTS[pre][0], n: items.length, done: items.filter(function (x, i) { return dn[pre + i]; }).length }); });
+        var on = ((S.xprep && S.xprep.days) || {})[d] || {}, xi = Object.keys((S.xprep && S.xprep.items) || {}).filter(function (id) { return on[id]; });
+        if (xi.length) out.push({ name: 'Extra prep', n: xi.length, done: xi.filter(function (id) { var x = S.xprep.items[id]; return x && x.done && x.done[d]; }).length });
+        var jobs = djobs(d); if (jobs.length) out.push({ name: 'Dough schedule', n: jobs.length, done: jobs.filter(function (j, i) { return dDone(d, i); }).length });
+        return out;
+      },
+      closed: function (d) { return S.xclose && S.xclose[d]; },
+      save: function (d, rec) { S.xclose = S.xclose || {}; S.xclose[d] = rec; quick('closeout/' + d, rec); render(); }
+    };
+    S.xclose = S.xclose || {};
+    var today = VIEWS.today;
+    VIEWS.today = function () { return signin() + today() + iceCard(t, es()) + closeCard(closeOpts); };
+    var r0 = render;
+    render = function () { r0.apply(this, arguments); try { rosterCols(); xpPlace(); x86Place(); foldStaff(); annotate(); nameChips(names().join(' + '), 'data-xwho', t('Tap to add or switch people', 'Toca para agregar o cambiar personas')); } catch (e) {} };
+    (function watch() {
+      if (typeof db === 'undefined' || !db) return setTimeout(watch, 300);
+      watchDoc('e86/board', function (d) { S.e86 = d || {}; render(); });
+      watchDoc('prepextra/board', function (d) { S.xprep = d || {}; render(); });
+      watchDoc('closeout/' + iso(new Date()), function (x) { S.xclose = S.xclose || {}; S.xclose[iso(new Date())] = x && x.at ? x : null; render(); });
+      watchDoc('invitems/board', function (d) { S.invitems = d || {}; render(); });
+      watchDoc('e86/icemachine', function (d) { S.ice = d || null; render(); });
+      watchCol('inv', function (d) { S.inv = d || {}; if (ui.tab === 'inventory' && !(document.activeElement && document.activeElement.dataset && document.activeElement.dataset.inv)) render(); });
+    })();
+    /* 5:30 PM ovens alert on bake days: a banner and a chime until the ovens step is ticked; red and chiming again after 5:45. */
+    runAlerts([{
+      key: 'ovens', at: '17:30', late: '17:45', until: '19:00',
+      text: t('5:30 PM: turn on both pizza ovens, 525 top and bottom. Bake starts at 6', '5:30 PM: prende los dos hornos de pizza, 525 arriba y abajo. Se hornea a las 6'),
+      lateText: t('(running late)', '(ya va tarde)'), doneText: t('Ovens are on', 'Hornos prendidos'), laterText: t('10 more minutes', '10 minutos m\u00e1s'), whoText: t('Who turned on the ovens?', '\u00bfQui\u00e9n prendi\u00f3 los hornos?'),
+      applies: function (d) { return djobs(d).some(function (j) { return j._i === 'ovens'; }); },
+      done: function (d) { var x = S.caldough && S.caldough[d]; return !!(x && x.done && x.done.ovens); },
+      mark: function (d, n) { quick('caldough/' + d, { done: { ovens: true }, by: { ovens: n || null } }); S.caldough = S.caldough || {}; S.caldough[d] = Object.assign({}, S.caldough[d], { done: Object.assign({}, (S.caldough[d] || {}).done, { ovens: true }) }); render(); }
+    }], function () { return iso(new Date()); }, names);
+    /* The name rides along with every shift check, next to the tracker's own done flag. */
+    document.addEventListener('change', function (e) {
+      if (whoSel(e, 'data-xwho', function (n) { setNames(names().concat([n])); })) { e.stopImmediatePropagation(); return; }
+      var inp = e.target; if (!inp || !inp.dataset) return;
+      if (inp.dataset.inv) { e.stopImmediatePropagation(); var ip = inp.dataset.inv.split('|'); invSetCount(ip[0], ip[1], inp.value === '' ? null : +inp.value); return; }
+      var nms = names();
+      if (inp.dataset.xprep) {
+        e.stopImmediatePropagation();
+        if (inp.checked && nms.length > 1) { askWho(nms, t('Who did this?', '\u00bfQui\u00e9n lo hizo?'), function (n) { if (!n) { inp.checked = false; return; } xpTick(inp.dataset.xprep, true, n); }); return; }
+        xpTick(inp.dataset.xprep, inp.checked); return;
+      }
+      /* A tap and the initials are saved together, in one write, instead of the board's save plus a second one for the name. */
+      if (inp.checked && nms.length > 1 && (inp.dataset.pdone || inp.dataset.chk)) {
+        e.stopImmediatePropagation();
+        askWho(nms, t('Who did this?', '\u00bfQui\u00e9n lo hizo?'), function (n) {
+          if (!n) { inp.checked = false; return; }
+          if (inp.dataset.pdone) { var pd2 = inp.dataset.pdate || ui.prepDate || iso(new Date()), pb2 = {}, pdn2 = {}; pb2[inp.dataset.pdone] = n; pdn2[inp.dataset.pdone] = true; quick('prep/' + pd2, { done: pdn2, by: pb2 }); S.prep = S.prep || {}; S.prep[pd2] = Object.assign({}, S.prep[pd2]); S.prep[pd2].by = Object.assign({}, S.prep[pd2].by || {}, pb2); }
+          else { var pt = inp.dataset.chk.split('|'), by2 = {}, dn2 = {}; by2[pt[1]] = n; dn2[pt[1]] = true; quick(pt[0], { done: dn2, by: by2 }); if (typeof checkListDone === 'function') checkListDone(pt[0], pt[1], true); byDocs[pt[0]] = Object.assign({}, byDocs[pt[0]] || {}, by2); if (S.shift && pt[0] === 'shifts/' + ui.date) S.shift.by = Object.assign({}, S.shift.by || {}, by2); }
+          setTimeout(annotate, 0);
+        });
+        return;
+      }
+      var nm = who();
+      if (inp.dataset.pdone) {
+        e.stopImmediatePropagation();
+        var pd = inp.dataset.pdate || ui.prepDate || iso(new Date()), pid = inp.dataset.pdone, pb = {}, pdn = {};
+        pb[pid] = inp.checked ? (nm || null) : null; pdn[pid] = inp.checked;
+        quick('prep/' + pd, { done: pdn, by: pb });
+        S.prep = S.prep || {}; S.prep[pd] = Object.assign({}, S.prep[pd]); S.prep[pd].by = Object.assign({}, S.prep[pd].by || {}, pb);
+        setTimeout(annotate, 0);
+        return;
+      }
+      if (!inp.dataset.chk) return;
+      e.stopImmediatePropagation();
+      var parts = inp.dataset.chk.split('|'), path = parts[0], id = parts[1];
+      var by = {}, dn = {}; by[id] = inp.checked ? (nm || null) : null; dn[id] = inp.checked;
+      quick(path, { done: dn, by: by });
+      if (typeof checkListDone === 'function') checkListDone(path, id, inp.checked);
+      byDocs[path] = Object.assign({}, byDocs[path] || {}, by);
+      if (S.shift && path === 'shifts/' + ui.date) { S.shift.by = Object.assign({}, S.shift.by || {}, by); }
+      setTimeout(annotate, 0);
+    }, true);
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest && e.target.closest('[data-x86],[data-xwho],[data-xprep-add],[data-xprep-del],[data-xprep-on],[data-xprep-off],[data-xprep-edit],[data-xclose],[data-inv-done],[data-inv-add],[data-inv-del],[data-inv-edit],[data-ice]'); if (!b) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      if (b.dataset.xclose) { closeNight(closeOpts); return; }
+      if (b.dataset.ice) { var ion = b.dataset.ice === 'on', inm = names(); if (inm.length > 1) askWho(inm, t('Who turned it ' + (ion ? 'on' : 'off') + '?', '\u00bfQui\u00e9n la ' + (ion ? 'prendi\u00f3' : 'apag\u00f3') + '?'), function (n) { if (n) { iceSet(ion, n, quick); render(); } }); else { iceSet(ion, inm[0] || '', quick); render(); } return; }
+      if (b.dataset.invEdit) { ui.invEdit = !ui.invEdit; render(); return; }
+      if (b.dataset.invAdd) { invAdd(b.dataset.invAdd, b.closest('section')); return; }
+      if (b.dataset.invDel) { var dp = b.dataset.invDel.split('|'); invDel(dp[0], dp[1]); return; }
+      if (b.dataset.invDone) { var ar = b.dataset.invDone, nn = names(); if (nn.length > 1) askWho(nn, t('Who counted?', '\u00bfQui\u00e9n cont\u00f3?'), function (n) { if (n) invDone(ar, n); }); else invDone(ar, nn[0] || ''); return; }
+      if (b.dataset.xprepAdd) { xpAdd(); return; }
+      if (b.dataset.xprepDel) { xpDel(b.dataset.xprepDel); return; }
+      if (b.dataset.xprepOn) { var xid = b.dataset.xprepOn; b.classList.add('flash'); b.disabled = true; setTimeout(function () { xpSetDay(xid, true); }, 260); return; }
+      if (b.dataset.xprepOff) { xpSetDay(b.dataset.xprepOff, false); return; }
+      if (b.dataset.xprepEdit) { ui.xpEdit = !ui.xpEdit; render(); return; }
+      if (b.dataset.x86 === 'open') { x86Open(); return; }
+      if (b.dataset.x86 === 'close') { x86Close(); return; }
+      if (b.dataset.x86 === 'add') add(); else if (b.dataset.x86 === 'back') back(b.dataset.id);
+      else if (b.dataset.xwho === 'pick') setNames(names().concat([b.dataset.name]));
+      else if (b.dataset.xwho === 'rm') { setNames(names().filter(function (n) { return n !== b.dataset.name; })); ui.whoEdit = true; render(); }
+      else if (b.dataset.xwho === 'out') { ui.whoEdit = true; render(); }
+      else if (b.dataset.xwho === 'done') { ui.whoEdit = false; render(); }
+      else if (b.dataset.xwho === 'in') { var x = document.getElementById('xwho-txt'); if (!x || !x.value.trim()) { if (x) x.focus(); return; } setNames(names().concat([x.value])); }
+    }, true);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { x86Close(); return; }
+      if (e.key !== 'Enter' || !e.target) return;
+      if (e.target.id === 'x86-name' || e.target.id === 'x86-note') { e.preventDefault(); add(); }
+      if (e.target.id === 'xwho-txt') { e.preventDefault(); if (e.target.value.trim()) setNames(names().concat([e.target.value])); }
+      if (e.target.id === 'xprep-name') { e.preventDefault(); xpAdd(); }
+    });
+    render();
+  }
+  start();
+})();
