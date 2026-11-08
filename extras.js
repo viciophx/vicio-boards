@@ -409,9 +409,22 @@
         var rows = expoDraft.filter(function (r) { return (r[0] || '').trim(); });
         S.expo = { rows: rows }; save('expo/matrix', { rows: rows, by: fnames()[0] || '', at: Date.now() }); ui.expoEdit = false; expoDraft = null; render();
       }, true);
+      /* The progress strip at the top of Today: Opening, Mid shift and Closing, across both roles. */
+      if (typeof shiftBar === 'function' && !shiftBar.__mid && typeof ROLES !== 'undefined') {
+        shiftBar = function (d, done) {
+          var seg = function (phase, label) {
+            var parts = Object.keys(ROLES).map(function (r) { var it = LISTS[r + '_' + phase] ? flat(r + '_' + phase, d) : []; return [ROLES[r], cnt(it, done), it.length]; }).filter(function (x) { return x[2]; });
+            var n = parts.reduce(function (a, p) { return a + p[1]; }, 0), tt = parts.reduce(function (a, p) { return a + p[2]; }, 0), p = pctOf(n, tt), left = parts.filter(function (x) { return x[1] < x[2]; }).map(function (x) { return x[0] + ' ' + x[1] + '/' + x[2]; });
+            return '<div class="seg ' + (p === 100 ? 'done' : '') + '"><div class="segbar"><i style="width:' + p + '%"></i></div><div class="seghead"><b>' + label + '</b><span>' + (p === 100 ? ft('Done', 'Listo') : n + ft(' of ', ' de ') + tt) + '</span></div>' +
+              '<p class="segleft">' + (p === 100 ? ft('All clear.', 'Todo listo.') : n ? ft('Left: ', 'Faltan: ') + esc(left.join(', ')) : ft('Nothing yet.', 'Nada a\u00fan.')) + '</p></div>';
+          };
+          return '<div class="shiftbar">' + seg('open', ft('Opening', 'Apertura')) + seg('mid', ft('Mid shift', 'Medio turno')) + seg('close', ft('Closing', 'Cierre')) + '</div>';
+        };
+        shiftBar.__mid = true;
+      }
       var closeOpts = {
         t: ft, es: fes, date: svcDate, names: fnames,
-        lists: function (d) { var dn = (S.shift && ui.date === d ? S.shift.done : null) || {}; return ['host_open', 'host_close', 'bar_open', 'bar_close'].map(function (k) { var items = sections(k, d).flatMap(function (s) { return s[1]; }); return { name: (k.indexOf('host') === 0 ? 'Host / Busser ' : 'Bartender ') + (k.slice(-4) === 'open' ? 'open' : 'close'), n: items.length, done: items.filter(function (x) { return dn[x[0]]; }).length }; }); },
+        lists: function (d) { var dn = (S.shift && ui.date === d ? S.shift.done : null) || {}; return ['host_open', 'host_mid', 'host_close', 'bar_open', 'bar_mid', 'bar_close'].filter(function (k) { return LISTS[k]; }).map(function (k) { var items = sections(k, d).flatMap(function (s) { return s[1]; }); return { name: (k.indexOf('host') === 0 ? 'Host / Busser ' : 'Bartender ') + ({ open: 'open', mid: 'mid shift', close: 'close' })[k.split('_')[1]], n: items.length, done: items.filter(function (x) { return dn[x[0]]; }).length }; }); },
         closed: function (d) { return S.xclose && S.xclose[d]; },
         save: function (d, rec) { S.xclose = S.xclose || {}; S.xclose[d] = rec; fquick('closeout/' + d, rec); render(); }
       };
