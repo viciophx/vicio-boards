@@ -279,9 +279,25 @@
           'Cold beer restocked in the storage fridge for tomorrow',
           'Expo window napkins restocked from the attic backups']]);
         LISTS.host_close.push(['Restrooms after close', [
-          'Women\u2019s restroom checked: clean, trash out, toilet paper, paper towels and soap stocked',
-          'Men\u2019s restroom checked: clean, trash out, toilet paper, paper towels and soap stocked']]);
+          'Women\u2019s restroom: quick look, no big mess left for the hotel. We don\u2019t clean or stock it',
+          'Men\u2019s restroom: quick look, no big mess left for the hotel. We don\u2019t clean or stock it']]);
       }
+      /* Restrooms are the hotel's to clean (Eric, Nov 8 2026). The busser only takes a quick look that they are in order, so
+         nothing is left in bad shape for the hotel crew after an incident. Same items, same ids, new words. */
+      var RR = { W: 'Women\u2019s restroom: quick look, no big mess left for the hotel. We don\u2019t clean or stock it', M: 'Men\u2019s restroom: quick look, no big mess left for the hotel. We don\u2019t clean or stock it' };
+      /* No bus tubs: dishes go on the cart and the kitchen handles them. Reservation and waitlist notes are not a busser job. */
+      var BUS = 'Dirty dishes on the cart; the kitchen handles them from there';
+      ['host_mid', 'host_close'].forEach(function (k) { (LISTS[k] || []).forEach(function (sec) { sec[1] = sec[1].map(function (x) { return typeof x !== 'string' ? x : /^Women\u2019s restroom checked/.test(x) ? RR.W : /^Men\u2019s restroom checked/.test(x) ? RR.M : /^Bus tubs emptied/.test(x) ? BUS : x; }); }); });
+      var DROP = /^(Reservation\/waitlist notes|Waitlist and reservations checked)/i;
+      if (typeof sections === 'function' && !sections.__drop) {
+        var secD = sections;
+        sections = function (key, d) { return secD(key, d).map(function (sc) { return [sc[0], sc[1].filter(function (it) { return !DROP.test(it[1]); })].concat(sc.slice(2)); }).filter(function (sc) { return sc[1].length; }); };
+        sections.__drop = true;
+      }
+      if (typeof ES === 'object' && ES) { ES[RR.W] = 'Ba\u00f1o de mujeres: un vistazo, que no quede un gran desorden para el hotel. No lo limpiamos ni surtimos'; ES[RR.M] = 'Ba\u00f1o de hombres: un vistazo, que no quede un gran desorden para el hotel. No lo limpiamos ni surtimos'; ES[BUS] = 'Platos sucios al carrito; la cocina se encarga de ellos'; ES['Restrooms after close'] = 'Ba\u00f1os despu\u00e9s del cierre'; }
+      try { (typeof TRACKS !== 'undefined' ? TRACKS : []).forEach(function (tr) { (tr.quiz || []).forEach(function (q) {
+        if (q.en && /restrooms mid shift/.test(q.en[0])) { q.en[1][1] = 'A quick look for a big mess. The hotel cleans and stocks it'; q.es[1][1] = 'Un vistazo por si hay un gran desorden. El hotel lo limpia y surte'; }
+      }); }); } catch (e) {}
       /* Special event nights (a buyout or ticketed event booked on Catering & Events): security and a door person. */
       var EV_SEC = LISTS && LISTS.host_open ? LISTS.host_open.length : 99;
       function eventNight(d) {
@@ -415,7 +431,8 @@
           var seg = function (phase, label) {
             var parts = Object.keys(ROLES).map(function (r) { var it = LISTS[r + '_' + phase] ? flat(r + '_' + phase, d) : []; return [ROLES[r], cnt(it, done), it.length]; }).filter(function (x) { return x[2]; });
             var n = parts.reduce(function (a, p) { return a + p[1]; }, 0), tt = parts.reduce(function (a, p) { return a + p[2]; }, 0), p = pctOf(n, tt), left = parts.filter(function (x) { return x[1] < x[2]; }).map(function (x) { return x[0] + ' ' + x[1] + '/' + x[2]; });
-            return '<div class="seg ' + (p === 100 ? 'done' : '') + '"><div class="segbar"><i style="width:' + p + '%"></i></div><div class="seghead"><b>' + label + '</b><span>' + (p === 100 ? ft('Done', 'Listo') : n + ft(' of ', ' de ') + tt) + '</span></div>' +
+            var col = p >= 90 ? 'var(--good,#4CC38A)' : p >= 50 ? 'var(--warn,#F0A43A)' : 'var(--bad,#E5484D)';
+            return '<div class="seg ' + (p === 100 ? 'done' : '') + '"><div class="segbar"><i style="width:' + p + '%;background:' + col + '"></i></div><div class="seghead"><b>' + label + '</b><span>' + (p === 100 ? ft('Done', 'Listo') : n + ft(' of ', ' de ') + tt) + '</span></div>' +
               '<p class="segleft">' + (p === 100 ? ft('All clear.', 'Todo listo.') : n ? ft('Left: ', 'Faltan: ') + esc(left.join(', ')) : ft('Nothing yet.', 'Nada a\u00fan.')) + '</p></div>';
           };
           return '<div class="shiftbar">' + seg('open', ft('Opening', 'Apertura')) + seg('mid', ft('Mid shift', 'Medio turno')) + seg('close', ft('Closing', 'Cierre')) + '</div>';
