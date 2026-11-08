@@ -321,6 +321,8 @@
         if (names.length && !ui.whoEdit) return '';
         var ppl = typeof stPeople === 'function' ? stPeople() : [];
         ppl = ppl.filter(function (p) { return p.group !== 'Kitchen'; }).concat(ppl.filter(function (p) { return p.group === 'Kitchen'; })).filter(function (p) { return names.indexOf(p.name) < 0; });
+        var on = typeof shiftsOn === 'function' ? shiftsOn(svcDate()).map(function (w) { return w.name; }) : [];
+        ppl = ppl.filter(function (p) { return on.indexOf(p.name) >= 0; }).concat(ppl.filter(function (p) { return on.indexOf(p.name) < 0; }));
         return whoRow(ft, 'data-fwho', names.length ? ft('On this device', 'En este aparato') : ft('Who is on tonight?', '\u00bfQui\u00e9n est\u00e1 esta noche?'), names, ppl);
       }
       var byDocs = {}, watched = {};
@@ -427,6 +429,21 @@
           var rows = Array.prototype.slice.call(lr.querySelectorAll('.lrow'));
           var col = function (side, label) { var c = document.createElement('div'); c.className = 'x-lcol'; c.innerHTML = '<h4 class="x-rh">' + label + '</h4>'; rows.filter(function (b) { return b.dataset.v === side; }).forEach(function (b) { c.appendChild(b); }); return c; };
           lr.classList.add('x-split'); lr.appendChild(col('host', ft('Host / Busser', 'Host / Busser'))); lr.appendChild(col('bar', ft('Bartender', 'Bartender')));
+        }
+        /* On tonight: one line of first names and times instead of a long list, with the sign-in pull-down inside the same
+           card, so who is on and who is signed in take one small box. */
+        var onCard = Array.prototype.slice.call(document.querySelectorAll('#view .grid.today > section.card')).find(function (c) { var h = c.querySelector('h3'); return h && /^On (tonight|[A-Z][a-z]+day)$/.test(h.textContent.trim()); });
+        if (onCard && !onCard.classList.contains('x-on')) {
+          onCard.classList.add('x-on');
+          var ul = onCard.querySelector('ul.plain');
+          if (ul) {
+            var p = document.createElement('p'); p.className = 'x-onl';
+            p.innerHTML = Array.prototype.slice.call(ul.children).map(function (li) { var b = li.querySelector('b'), m = li.querySelector('.muted'), tt = m ? (m.textContent.split('\u00b7')[1] || '').trim() : ''; return '<span><b>' + esc(b ? b.textContent : li.textContent) + '</b>' + (tt ? ' ' + esc(tt) : '') + '</span>'; }).join('');
+            ul.replaceWith(p);
+          }
+          var sg = document.querySelector('#view .x-signin');
+          if (sg) { sg.classList.add('x-inon'); onCard.insertBefore(sg, onCard.querySelector('.nav')); }
+          else if (fnames().length) { var who = document.createElement('div'); who.className = 'x-onwho'; who.innerHTML = ft('Signed in', 'Firmado') + ': <b>' + esc(fnames().join(', ')) + '</b> <button type="button" class="btn x" data-fwho="out">' + ft('Change', 'Cambiar') + '</button>'; onCard.insertBefore(who, onCard.querySelector('.nav')); }
         }
         var nt = document.querySelector('#view details[data-fold="notes"]'), nr = document.querySelector('#view details[data-fold="night"]');
         if (nt && nr && !nt.parentNode.classList.contains('x-pair')) { var g = document.createElement('div'); g.className = 'grid x-pair'; nr.parentNode.insertBefore(g, nr); g.appendChild(nt); g.appendChild(nr); }
@@ -576,7 +593,7 @@
         else if (b.dataset.xlu === 'use') luUse();
         else if (b.dataset.xlu === 'plan' && !ui.luBusy && adm()) luPlan();
       }, true);
-      var LAYOUT_CSS = '.x-lunav{display:flex;gap:8px;margin:4px 0 10px}.x-lunav .btn{flex:1;min-height:44px}.x-lineup .lday{font-weight:400;font-size:15px;margin-left:6px}.x-lu{margin:0 0 8px}' + '.x-noimg{display:grid;place-items:center;height:120px;border:1px dashed var(--line,#ccc);border-radius:12px;color:var(--muted);font-size:14px;margin-bottom:10px}' + '.lrows.x-split{grid-template-columns:1fr 1fr;align-items:start;gap:14px}.x-lcol{display:grid;gap:8px;min-width:0}.x-lcol .x-rh{margin:0 0 2px}@media (max-width:640px){.lrows.x-split{grid-template-columns:1fr}}.x-pair{align-items:start}.x-pair>details{align-self:start;margin:0}';
+      var LAYOUT_CSS = '.x-onl{display:flex;flex-wrap:wrap;gap:4px 14px;margin:2px 0 6px;font-size:14.5px}.x-onl span{white-space:nowrap}.x-onl b{font-weight:700}.x-on .x-signin.x-inon{border:0;padding:6px 0 0;margin:0;background:none;box-shadow:none}.x-on .x-inon .x-lbl{display:none}.x-onwho{font-size:14px;margin:2px 0 6px}.x-onwho .btn.x{min-height:32px;margin-left:6px}' + '.x-lunav{display:flex;gap:8px;margin:4px 0 10px}.x-lunav .btn{flex:1;min-height:44px}.x-lineup .lday{font-weight:400;font-size:15px;margin-left:6px}.x-lu{margin:0 0 8px}' + '.x-noimg{display:grid;place-items:center;height:120px;border:1px dashed var(--line,#ccc);border-radius:12px;color:var(--muted);font-size:14px;margin-bottom:10px}' + '.lrows.x-split{grid-template-columns:1fr 1fr;align-items:start;gap:14px}.x-lcol{display:grid;gap:8px;min-width:0}.x-lcol .x-rh{margin:0 0 2px}@media (max-width:640px){.lrows.x-split{grid-template-columns:1fr}}.x-pair{align-items:start}.x-pair>details{align-self:start;margin:0}';
       var st2 = document.createElement('style'); st2.textContent = LAYOUT_CSS + '.x-rh{font:700 13px var(--f-mono,monospace);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}'; document.head.appendChild(st2);
       var r0 = render;
       render = function () { r0.apply(this, arguments); try { todayLayout(); rosterCols(); foldStaff(); annotate(); nameChips(fnames().join(' + '), 'data-fwho', ft('Tap to add or switch people', 'Toca para agregar o cambiar personas')); } catch (e) {} };
