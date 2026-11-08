@@ -180,7 +180,6 @@
   var CLOSE_CSS = ICE_CSS + '.x-close.done{border-color:var(--good,#1F6B3A)}.x-close.done .count{color:var(--good,#1F6B3A)}';
   /* Staff page: the roster in two columns, BOH (Kitchen) and FOH (everyone else), instead of one long list. */
   function rosterCols() {
-    if (ui.tab !== 'staff') return;
     var ul = document.querySelector('ul.rlist'); if (!ul || ul.closest('.x-roster')) return;
     var lis = Array.prototype.slice.call(ul.children);
     var boh = lis.filter(function (li) { var g = li.querySelector('.ptag'), r = li.querySelector('.rr'); return (g && /kitchen|cocina/i.test(g.textContent)) || (r && /cook|cocin|dish|prep|chef|kitchen/i.test(r.textContent)); }), foh = lis.filter(function (li) { return boh.indexOf(li) < 0; });
@@ -191,7 +190,26 @@
     });
     ul.replaceWith(wrap);
   }
-  var ROSTER_CSS = '.x-roster{margin:4px 0 12px}.x-roster .x-rh{margin:0 0 6px;font:700 13px var(--f-mono,monospace);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}.x-roster .x-rh span{font-weight:400}.x-roster ul{margin:0}';
+  /* Who's working and Roster fold open and shut. Each board draws them as plain cards; after every draw they are turned into
+     folds, and whether each is open is remembered on this device (Who's working starts open, Roster starts folded). */
+  function foldStaff() {
+    var view = document.getElementById('view'); if (!view) return;
+    var st = {}; try { st = JSON.parse(localStorage.getItem('vicio_staff_folds') || '{}') || {}; } catch (e) {}
+    view.querySelectorAll('section.card').forEach(function (sec) {
+      var h = sec.querySelector('h3'); if (!h) return;
+      var txt = h.textContent.trim(), key = sec.querySelector('.rlist, .x-roster') || /^roster$/i.test(txt) ? 'roster' : /^(who.?s working|qui\u00e9n trabaja)/i.test(txt) ? 'working' : null;
+      if (!key) return;
+      var d = document.createElement('details'); d.className = sec.className + ' fold x-sfold'; d.dataset.sfold = key;
+      if (st[key] == null ? key === 'working' : st[key]) d.open = true;
+      var head = sec.querySelector(':scope > .cardhead'), sum = document.createElement('summary');
+      if (!head) { head = document.createElement('span'); head.className = 'cardhead'; head.appendChild(h); var cn = document.createElement('span'); cn.className = 'count'; head.appendChild(cn); } else { var sp = document.createElement('span'); sp.className = 'cardhead'; while (head.firstChild) sp.appendChild(head.firstChild); head.remove(); head = sp; } sum.appendChild(head);
+      d.appendChild(sum); while (sec.firstChild) d.appendChild(sec.firstChild);
+      d.addEventListener('toggle', function () { var s2 = {}; try { s2 = JSON.parse(localStorage.getItem('vicio_staff_folds') || '{}') || {}; } catch (e) {} s2[key] = d.open; try { localStorage.setItem('vicio_staff_folds', JSON.stringify(s2)); } catch (e) {} });
+      sec.replaceWith(d);
+    });
+  }
+  var SFOLD_CSS = '.x-sfold>summary h3{margin:0}.x-sfold[open]>summary{margin-bottom:10px}';
+  var ROSTER_CSS = SFOLD_CSS + '.x-roster{margin:4px 0 12px}.x-roster .x-rh{margin:0 0 6px;font:700 13px var(--f-mono,monospace);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}.x-roster .x-rh span{font-weight:400}.x-roster ul{margin:0}';
   /* Sign-in as one compact row: a pull-down of the roster (own side first), Someone else opens a name box.
      People already signed in on this device show as small chips with an x. attr is data-fwho (FOH) or data-xwho (BOH). */
   function whoRow(T, attr, title, signed, ppl) {
@@ -416,7 +434,7 @@
       var LAYOUT_CSS = '.lrows.x-split{grid-template-columns:1fr 1fr;align-items:start;gap:14px}.x-lcol{display:grid;gap:8px;min-width:0}.x-lcol .x-rh{margin:0 0 2px}@media (max-width:640px){.lrows.x-split{grid-template-columns:1fr}}.x-pair{align-items:start}.x-pair>details{align-self:start;margin:0}';
       var st2 = document.createElement('style'); st2.textContent = LAYOUT_CSS + '.x-rh{font:700 13px var(--f-mono,monospace);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}'; document.head.appendChild(st2);
       var r0 = render;
-      render = function () { r0.apply(this, arguments); try { todayLayout(); rosterCols(); annotate(); nameChips(fnames().join(' + '), 'data-fwho', ft('Tap to add or switch people', 'Toca para agregar o cambiar personas')); } catch (e) {} };
+      render = function () { r0.apply(this, arguments); try { todayLayout(); rosterCols(); foldStaff(); annotate(); nameChips(fnames().join(' + '), 'data-fwho', ft('Tap to add or switch people', 'Toca para agregar o cambiar personas')); } catch (e) {} };
       /* A tap and the name go out together, at once, so a box never flips back while it saves. */
       function saveTick(path, id, on, nm) {
         var patch = { done: {} }; patch.done[id] = on;
@@ -873,7 +891,7 @@
     var today = VIEWS.today;
     VIEWS.today = function () { return signin() + today() + iceCard(t, es()) + closeCard(closeOpts); };
     var r0 = render;
-    render = function () { r0.apply(this, arguments); try { rosterCols(); xpPlace(); x86Place(); annotate(); nameChips(names().join(' + '), 'data-xwho', t('Tap to add or switch people', 'Toca para agregar o cambiar personas')); } catch (e) {} };
+    render = function () { r0.apply(this, arguments); try { rosterCols(); foldStaff(); xpPlace(); x86Place(); annotate(); nameChips(names().join(' + '), 'data-xwho', t('Tap to add or switch people', 'Toca para agregar o cambiar personas')); } catch (e) {} };
     (function watch() {
       if (typeof db === 'undefined' || !db) return setTimeout(watch, 300);
       watchDoc('e86/board', function (d) { S.e86 = d || {}; render(); });
