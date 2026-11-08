@@ -480,7 +480,83 @@
         };
         foodPreview.__simple = true;
       }
-      var LAYOUT_CSS = '.x-noimg{display:grid;place-items:center;height:120px;border:1px dashed var(--line,#ccc);border-radius:12px;color:var(--muted);font-size:14px;margin-bottom:10px}' + '.lrows.x-split{grid-template-columns:1fr 1fr;align-items:start;gap:14px}.x-lcol{display:grid;gap:8px;min-width:0}.x-lcol .x-rh{margin:0 0 2px}@media (max-width:640px){.lrows.x-split{grid-template-columns:1fr}}.x-pair{align-items:start}.x-pair>details{align-self:start;margin:0}';
+      /* TV lineup: no asking and waiting. The Suggest card on Media becomes a Lineup card that shows the planned lineup for
+         the day on the date bar, with Previous night and Next night to step through the two weeks ahead. The plan lives
+         at tvplan/next {nights:[{date, tv:{f345,tv1,tv2:{show,ch}}, notes}], updated}, the same record the Coming up
+         section reads. Building it needs Claude and the browser, so only Colette's Board and the manager PIN see
+         Plan the next 2 weeks; staff only see the result. */
+      var TVORDER = [['f345', ft('TVs 3-5', 'TVs 3-5'), true], ['tv1', 'TV 1', false], ['tv2', 'TV 2', false]];
+      function planNights() { return ((S.tvplan && S.tvplan.nights) || []).filter(function (n) { return n && n.date; }).sort(function (a, b) { return a.date < b.date ? -1 : 1; }); }
+      function openDays(n) { var out = [], d = svcDate(); for (var i = 0; out.length < 99 && i < n; i++) { var k = addDays(d, i); if (OPEN[parse(k).getDay()]) out.push(k); } return out; }
+      function lineupCard() {
+        var nights = planNights(), d = ui.date, night = nights.find(function (n) { return n.date === d; }) || null;
+        var steps = nights.length ? nights.map(function (n) { return n.date; }) : openDays(14);
+        var prev = steps.filter(function (k) { return k < d; }).pop(), next = steps.find(function (k) { return k > d; });
+        var cur = (S.tvday && S.tvday.tv) || {}, onTv = night && TVORDER.every(function (o) { var a = (night.tv || {})[o[0]] || {}, b = cur[o[0]] || {}; return !a.show || (b.show === a.show); });
+        var body = night ? '<ul class="tvnl x-lu">' + TVORDER.map(function (o) { var v = (night.tv || {})[o[0]] || {}; return '<li><span class="tvk' + (o[2] ? ' snd' : '') + '">' + o[1] + '</span><span><b>' + esc(v.show || ft('Not set', 'Sin asignar')) + '</b>' + (v.ch ? '<span class="status">' + esc(v.ch) + '</span>' : '') + '</span></li>'; }).join('') + '</ul>' +
+            ((night.notes || []).length ? '<ul class="plain">' + night.notes.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '') +
+            '<div class="chips">' + (onTv ? '<span class="pill good">' + ft('On the TVs below', 'Ya en las TVs') + '</span>' : '<button type="button" class="btn primary" data-xlu="use">' + ft('Put this on the TVs', 'Ponerlo en las TVs') + '</button>') + '</div>' +
+            '<p class="status">' + ft('Sound goes on TVs 3-5. Check the channel before you switch: schedules change and games run long.', 'El sonido va en las TVs 3-5. Revisa el canal antes de cambiar: los horarios cambian.') + '</p>'
+          : '<p class="status">' + (OPEN[parse(d).getDay()] ? ft('No lineup planned for this night yet.', 'A\u00fan no hay programaci\u00f3n para esta noche.') : ft('Closed this day.', 'Cerrado este d\u00eda.')) + (adm() ? '' : ' ' + ft('A manager plans two weeks at a time.', 'Un gerente planea dos semanas a la vez.')) + '</p>';
+        var tools = adm() ? '<div class="chips" style="margin-top:8px"><button type="button" class="btn" data-xlu="plan"' + (ui.luBusy ? ' disabled' : '') + '>' + (ui.luBusy ? ft('Planning\u2026', 'Planeando\u2026') : ft('Plan the next 2 weeks', 'Planear 2 semanas')) + '</button><span class="status">' + esc(ui.luMsg || (S.tvplan && S.tvplan.updated ? ft('Planned ', 'Planeado ') + new Date(S.tvplan.updated).toLocaleDateString(fes() ? 'es-MX' : 'en-US', { month: 'short', day: 'numeric' }) : '')) + '</span></div>' : '';
+        return '<section class="card x-lineup' + (night ? '' : ' edge') + '"><div class="cardhead"><h3>' + ft('Lineup', 'Programaci\u00f3n') + ' <span class="lday">' + (d === svcDate() ? '<b>' + ft('Tonight', 'Hoy') + '</b> \u00b7 ' : '') + esc(fmt(d, { weekday: 'long', month: 'short', day: 'numeric' })) + '</span></h3></div>' +
+          '<div class="nav x-lunav"><button type="button" class="btn" data-xlu="go" data-d="' + (prev || '') + '"' + (prev ? '' : ' disabled') + '>\u2039 ' + ft('Previous night', 'Noche anterior') + '</button><button type="button" class="btn" data-xlu="go" data-d="' + (next || '') + '"' + (next ? '' : ' disabled') + '>' + ft('Next night', 'Siguiente noche') + ' \u203a</button></div>' +
+          body + tools + '</section>';
+      }
+      if (typeof VIEWS.sop === 'function' && !VIEWS.sop.__lu) {
+        var md0 = VIEWS.sop;
+        VIEWS.sop = function () {
+          var h = md0.apply(this, arguments), i = h.indexOf('data-fold="tvsugg"');
+          if (i < 0) return h;
+          var a = h.lastIndexOf('<details', i), b = h.indexOf('</details>', i);
+          return a < 0 || b < 0 ? h : h.slice(0, a) + lineupCard() + h.slice(b + 10);
+        };
+        VIEWS.sop.__lu = true;
+      }
+      function luUse() {
+        var night = planNights().find(function (n) { return n.date === ui.date; }); if (!night) return;
+        var tv = {}; TVORDER.forEach(function (o) { var v = (night.tv || {})[o[0]]; if (v && v.show) tv[o[0]] = { show: String(v.show), ch: String(v.ch || '') }; });
+        var patch = { tv: tv, sound: 'f345' }; S.tvday = Object.assign({}, S.tvday, patch); save('tvday/' + ui.date, patch); render();
+      }
+      async function luPlan() {
+        ui.luBusy = true; ui.luMsg = ft('Reading the schedules\u2026', 'Leyendo los horarios\u2026'); render();
+        try {
+          var c = window.claude, sample = c && c.use ? await c.use('sample') : null;
+          if (!sample) throw { message: ft('Planning needs Claude: run it from Colette\u2019s Board in the Claude app.', 'Planear necesita Claude: hazlo desde el tablero de Colette en la app de Claude.') };
+          var days = openDays(14), pages = '', mcp = c.use ? await c.use('mcp').catch(function () { return null; }) : null;
+          if (mcp) for (var u = 0; u < SPORT_PAGES.length; u++) {
+            try {
+              var r = await mcp.callTool('host:claude_browser', 'preview_start', { url: SPORT_PAGES[u] }), tabId = r && r.payload && (r.payload.tabId || (typeof r.payload === 'string' ? r.payload : null));
+              await new Promise(function (x) { setTimeout(x, 2500); });
+              var tx = await mcp.callTool('host:claude_browser', 'get_page_text', tabId ? { tabId: tabId, max_chars: 15000 } : { max_chars: 15000 });
+              pages += '\n\n=== ' + SPORT_PAGES[u] + ' ===\n' + (tx && tx.payload ? (typeof tx.payload === 'string' ? tx.payload : JSON.stringify(tx.payload)) : '').slice(0, 15000);
+              if (tabId) mcp.callTool('host:claude_browser', 'tabs_close', { tabId: tabId }).catch(function () {});
+            } catch (e) {}
+          }
+          if (!pages) throw { message: ft('Could not open the schedule pages. Run this in the Claude desktop app.', 'No se pudieron abrir los horarios. Hazlo en la app de Claude de escritorio.') };
+          ui.luMsg = ft('Picking the lineups\u2026', 'Eligiendo la programaci\u00f3n\u2026'); render();
+          var nightsIn = days.map(function (k) { return { date: k, day: DAYN[parse(k).getDay()], hours: OPEN[parse(k).getDay()] }; });
+          var out = await sample.json('You plan the TVs for Vicio, a Detroit style pizza and cocktail bar in downtown Phoenix, Arizona, with a Latin crowd and a DJ on weekends. Plan every open night below. All times Arizona time (MST, no daylight saving). Only pick games live or starting during that night\u2019s hours. Priority: 1) Phoenix teams (Suns, Cardinals, Diamondbacks, Mercury, ASU, Arizona Wildcats, Phoenix Rising); 2) the biggest national games; 3) Liga MX, Mexico national team, big boxing and UFC; 4) other live games. Three feeds: f345 is shown on TVs 3, 4 and 5 and is the only one with sound, so it gets the biggest game; tv1 and tv2 face the dining room. Never invent a game: use only games in the schedule pages. If a night has nothing listed yet, leave its shows empty and add a note \"Check listings that week\". Put the start time in the show text, like \"Suns vs Lakers, 7 PM\". Nights: ' + JSON.stringify(nightsIn) + '. Schedule pages: ' + pages.slice(0, 80000) + '\nAnswer with JSON only: {"nights":[{"date":"YYYY-MM-DD","tv":{"f345":{"show":"","ch":""},"tv1":{"show":"","ch":""},"tv2":{"show":"","ch":""}},"notes":["at most 2 short notes"]}]}', { modelTier: 'default', cache: false });
+          var ok = {}; days.forEach(function (k) { ok[k] = 1; });
+          var nights = ((out && out.nights) || []).filter(function (n) { return n && ok[n.date]; }).map(function (n) {
+            var tv = {}; TVORDER.forEach(function (o) { var v = (n.tv || {})[o[0]] || {}; tv[o[0]] = { show: String(v.show || '').slice(0, 70), ch: String(v.ch || '').slice(0, 40) }; });
+            return { date: n.date, tv: tv, notes: (n.notes || []).slice(0, 2).map(function (x) { return String(x).slice(0, 160); }) };
+          });
+          if (!nights.length) throw { message: ft('Claude did not return a plan. Try again in a minute.', 'Claude no devolvi\u00f3 un plan. Intenta en un minuto.') };
+          var keep = planNights().filter(function (n) { return !ok[n.date] && n.date >= svcDate(); });
+          var rec = { nights: keep.concat(nights).sort(function (a, b) { return a.date < b.date ? -1 : 1; }), updated: Date.now() };
+          S.tvplan = rec; save('tvplan/next', rec);
+          ui.luMsg = ft('Planned ' + nights.length + ' nights.', nights.length + ' noches planeadas.');
+        } catch (e) { ui.luMsg = (e && e.code === 'not_granted') ? ft('Allow Claude for this page first.', 'Permite Claude en esta p\u00e1gina primero.') : (e && e.message) || ft('Could not plan the lineups.', 'No se pudo planear.'); }
+        ui.luBusy = false; render();
+      }
+      document.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('[data-xlu]'); if (!b) return; e.preventDefault(); e.stopImmediatePropagation();
+        if (b.dataset.xlu === 'go' && b.dataset.d) { ui.date = b.dataset.d; S.shift = {}; if (typeof subShiftTo === 'function') subShiftTo(ui.date); render(); }
+        else if (b.dataset.xlu === 'use') luUse();
+        else if (b.dataset.xlu === 'plan' && !ui.luBusy && adm()) luPlan();
+      }, true);
+      var LAYOUT_CSS = '.x-lunav{display:flex;gap:8px;margin:4px 0 10px}.x-lunav .btn{flex:1;min-height:44px}.x-lineup .lday{font-weight:400;font-size:15px;margin-left:6px}.x-lu{margin:0 0 8px}' + '.x-noimg{display:grid;place-items:center;height:120px;border:1px dashed var(--line,#ccc);border-radius:12px;color:var(--muted);font-size:14px;margin-bottom:10px}' + '.lrows.x-split{grid-template-columns:1fr 1fr;align-items:start;gap:14px}.x-lcol{display:grid;gap:8px;min-width:0}.x-lcol .x-rh{margin:0 0 2px}@media (max-width:640px){.lrows.x-split{grid-template-columns:1fr}}.x-pair{align-items:start}.x-pair>details{align-self:start;margin:0}';
       var st2 = document.createElement('style'); st2.textContent = LAYOUT_CSS + '.x-rh{font:700 13px var(--f-mono,monospace);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}'; document.head.appendChild(st2);
       var r0 = render;
       render = function () { r0.apply(this, arguments); try { todayLayout(); rosterCols(); foldStaff(); annotate(); nameChips(fnames().join(' + '), 'data-fwho', ft('Tap to add or switch people', 'Toca para agregar o cambiar personas')); } catch (e) {} };
