@@ -9,7 +9,11 @@
    the same split Colette's Board uses, so the Kitchen and FOH checklists never overwrite each other. */
 (function () {
   /* Page add-ons (extras.js) load on every board, connected or not, always fresh. */
-  try { var xs = document.createElement('script'); xs.src = 'extras.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(xs); } catch (e) {}
+  /* Preview: the same page with ?preview in the link loads extras-preview.js (changes Eric is still reviewing) instead of
+     extras.js, shows a PREVIEW badge, and follows version-preview.txt. Without ?preview nothing here changes. */
+  var PREVIEW = /[?&]preview\b/.test(location.search);
+  try { var xs = document.createElement('script'); xs.src = (PREVIEW ? 'extras-preview.js' : 'extras.js') + '?v=' + Date.now(); (document.head || document.documentElement).appendChild(xs); } catch (e) {}
+  if (PREVIEW) document.addEventListener('DOMContentLoaded', function () { var b = document.createElement('div'); b.textContent = 'PREVIEW \u00b7 not live yet'; b.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:6px;z-index:2147483647;background:#F0A43A;color:#111;font:700 12px system-ui;letter-spacing:.08em;padding:4px 12px;border-radius:999px;pointer-events:none'; document.body.appendChild(b); });
   /* Online pickup orders (orders-addon.js): the same screen Colette's Board runs, so the iPads hear and work orders too.
      It waits for the store, so it is fine to load before the PIN. ord and osettings are shared across the boards. */
   try { var os = document.createElement('script'); os.src = 'orders-addon.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(os); } catch (e) {}
@@ -18,7 +22,7 @@
   (function () {
     var build = null;
     function check() {
-      fetch('version.txt?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (v) {
+      fetch((PREVIEW ? 'version-preview.txt' : 'version.txt') + '?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (v) {
         v = String(v || '').trim(); if (!v) return;
         if (build === null) { build = v; return; }
         if (v === build) return;
