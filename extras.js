@@ -190,25 +190,45 @@
     });
     ul.replaceWith(wrap);
   }
-  /* Who's working and Roster fold open and shut. Each board draws them as plain cards; after every draw they are turned into
-     folds, and whether each is open is remembered on this device (Who's working starts open, Roster starts folded). */
+  /* Every card folds open and shut (Eric, Nov 8 2026). Each board draws plain cards; after every draw each one that has a
+     title becomes a fold, keeping its header (counts, names, buttons). Whether a card is open is remembered on this device,
+     per board, page and title. Cards start open, except the Roster. Left alone: the sign-in row, cards inside the menu
+     and drinks book, pop-up panels, and cards that are already folds. */
+  var FOLD_KEY = 'vicio_folds';
+  function foldGet() { try { return JSON.parse(localStorage.getItem(FOLD_KEY) || '{}') || {}; } catch (e) { return {}; } }
+  function foldSet(k, v) { var s2 = foldGet(); s2[k] = v; try { localStorage.setItem(FOLD_KEY, JSON.stringify(s2)); } catch (e) {} }
   function foldStaff() {
     var view = document.getElementById('view'); if (!view) return;
-    var st = {}; try { st = JSON.parse(localStorage.getItem('vicio_staff_folds') || '{}') || {}; } catch (e) {}
-    view.querySelectorAll('section.card').forEach(function (sec) {
-      var h = sec.querySelector('h3'); if (!h) return;
-      var txt = h.textContent.trim(), key = sec.querySelector('.rlist, .x-roster') || /^roster$/i.test(txt) ? 'roster' : /^(who.?s working|qui\u00e9n trabaja)/i.test(txt) ? 'working' : null;
-      if (!key) return;
-      var d = document.createElement('details'); d.className = sec.className + ' fold x-sfold'; d.dataset.sfold = key;
-      if (st[key] == null ? key === 'working' : st[key]) d.open = true;
-      var head = sec.querySelector(':scope > .cardhead'), sum = document.createElement('summary');
-      if (!head) { head = document.createElement('span'); head.className = 'cardhead'; head.appendChild(h); var cn = document.createElement('span'); cn.className = 'count'; head.appendChild(cn); } else { var sp = document.createElement('span'); sp.className = 'cardhead'; while (head.firstChild) sp.appendChild(head.firstChild); head.remove(); head = sp; } sum.appendChild(head);
-      d.appendChild(sum); while (sec.firstChild) d.appendChild(sec.firstChild);
-      d.addEventListener('toggle', function () { var s2 = {}; try { s2 = JSON.parse(localStorage.getItem('vicio_staff_folds') || '{}') || {}; } catch (e) {} s2[key] = d.open; try { localStorage.setItem('vicio_staff_folds', JSON.stringify(s2)); } catch (e) {} });
+    var st = foldGet();
+    view.querySelectorAll('section.card, div.card').forEach(function (sec) {
+      if (sec.classList.contains('x-signin') || sec.classList.contains('pview') || sec.closest('.pview, .pbook, .plist2, #x86-modal, details, #vo')) return;
+      var head = sec.querySelector(':scope > .cardhead'), h = head ? head.querySelector('h2, h3') : sec.querySelector(':scope > h2, :scope > h3');
+      /* Cards with the header one level down (BOH 90-day plan: week label beside the body) fold on that inner header. */
+      var pre = null;
+      if (!h) { head = sec.querySelector(':scope > div > .cardhead'); h = head ? head.querySelector('h2, h3') : null; if (h) pre = sec.querySelector(':scope > .phase-when'); }
+      if (!h) return;
+      var title = ((h.firstChild && h.firstChild.nodeType === 3 ? h.firstChild.textContent : h.textContent) || '').trim();
+      var role = sec.querySelector('.rlist, .x-roster') || /^roster$/i.test(title) ? 'roster' : null;
+      var key = BOARD + ':' + (ui.tab || '') + ':' + (role || title.toLowerCase());
+      var d = document.createElement('details'); d.className = sec.className + ' fold x-sfold'; d.dataset.sfold = role || 'card';
+      if (sec.id) d.id = sec.id;
+      if (st[key] == null ? role !== 'roster' : st[key]) d.open = true;
+      var sum = document.createElement('summary'), sp = document.createElement('span'); sp.className = 'cardhead';
+      if (pre) { var pw = document.createElement('span'); pw.className = 'x-pre'; pw.textContent = pre.firstChild ? pre.firstChild.textContent : pre.textContent; sp.appendChild(pw); }
+      if (head) { while (head.firstChild) sp.appendChild(head.firstChild); head.remove(); } else sp.appendChild(h);
+      if (!sp.querySelector('.count')) { var cn = document.createElement('span'); cn.className = 'count'; sp.appendChild(cn); }
+      sum.appendChild(sp); d.appendChild(sum); while (sec.firstChild) d.appendChild(sec.firstChild);
+      d.addEventListener('toggle', function () { foldSet(key, d.open); });
       sec.replaceWith(d);
     });
   }
-  var SFOLD_CSS = '.x-sfold>summary h3{margin:0}.x-sfold[open]>summary{margin-bottom:10px}';
+  /* A tap on a button, link or box inside a fold's header does its job without opening or closing the fold. */
+  document.addEventListener('click', function (e) {
+    var sm = e.target.closest && e.target.closest('details.x-sfold > summary'); if (!sm) return;
+    var ctl = e.target.closest('button, a, input, select, textarea, label'); if (!ctl || !sm.contains(ctl)) return;
+    var d = sm.parentNode, was = d.open; setTimeout(function () { if (d.open !== was) d.open = was; }, 0);
+  }, true);
+  var SFOLD_CSS = 'details.x-sfold.phase{display:block}details.x-sfold.phase>summary h3{margin-right:auto}details.x-sfold.phase>.phase-when{display:none}.x-sfold .x-pre{font:700 12px var(--f-mono,monospace);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-right:4px}.x-sfold>summary h3{margin:0}.x-sfold[open]>summary{margin-bottom:10px}.x-sfold>summary .cardhead{flex-wrap:wrap}';
   var ROSTER_CSS = SFOLD_CSS + '.x-roster{margin:4px 0 12px}.x-roster .x-rh{margin:0 0 6px;font:700 13px var(--f-mono,monospace);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}.x-roster .x-rh span{font-weight:400}.x-roster ul{margin:0}';
   /* Sign-in as one compact row: a pull-down of the roster (own side first), Someone else opens a name box.
      People already signed in on this device show as small chips with an x. attr is data-fwho (FOH) or data-xwho (BOH). */
@@ -1016,7 +1036,7 @@
     var today = VIEWS.today;
     VIEWS.today = function () { return signin() + today() + iceCard(t, es()) + closeCard(closeOpts); };
     var r0 = render;
-    render = function () { r0.apply(this, arguments); try { rosterCols(); foldStaff(); xpPlace(); x86Place(); annotate(); nameChips(names().join(' + '), 'data-xwho', t('Tap to add or switch people', 'Toca para agregar o cambiar personas')); } catch (e) {} };
+    render = function () { r0.apply(this, arguments); try { rosterCols(); xpPlace(); x86Place(); foldStaff(); annotate(); nameChips(names().join(' + '), 'data-xwho', t('Tap to add or switch people', 'Toca para agregar o cambiar personas')); } catch (e) {} };
     (function watch() {
       if (typeof db === 'undefined' || !db) return setTimeout(watch, 300);
       watchDoc('e86/board', function (d) { S.e86 = d || {}; render(); });
