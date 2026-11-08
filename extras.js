@@ -393,6 +393,26 @@
         var nt = document.querySelector('#view details[data-fold="notes"]'), nr = document.querySelector('#view details[data-fold="night"]');
         if (nt && nr && !nt.parentNode.classList.contains('x-pair')) { var g = document.createElement('div'); g.className = 'grid x-pair'; nr.parentNode.insertBefore(g, nr); g.appendChild(nt); g.appendChild(nr); }
       }
+      /* Schedule page for staff: Events near downtown is read-only (no add, remove or find), and Draft next week's
+         schedule is gone. Both stay whole for the manager PIN (the store's role) and on Colette's Board, since adding events
+         and drafting the schedule are admin work. The board's own mgr() is true for everyone, so it can't be used here. */
+      var adm = function () { try { return !!window.__vicioInline || (window.VicioStore && VicioStore.role && VicioStore.role() === 'manager'); } catch (e) { return false; } };
+      if (typeof vEvents === 'function' && !vEvents.__ro) {
+        var ev0 = vEvents;
+        vEvents = function (days) {
+          if (adm()) return ev0(days);
+          var all = days.flatMap(function (k) { return evOn(k); }), byDay = days.map(function (k) { return [k, evOn(k)]; }).filter(function (x) { return x[1].length; });
+          return fold('events', ft('Events near downtown', 'Eventos cerca del centro'), all.length ? all.length + ft(' in two weeks', ' en dos semanas') : ft('None listed', 'Ninguno'),
+            '<p class="status">' + ft('Suns, Mercury, D-backs, concerts, festivals and conventions nearby. Expect a rush before and after.', 'Suns, Mercury, D-backs, conciertos, festivales y convenciones cerca. Espera m\u00e1s gente antes y despu\u00e9s.') + '</p>' +
+            (byDay.length ? byDay.map(function (x) { return '<p class="grp">' + esc(longDate(x[0])) + '</p><ul class="checks plist">' + x[1].map(function (e) { return '<li><span class="ptime">' + esc(e.time || '') + '</span><span><b>' + esc(e.title) + '</b> <span class="muted">' + esc(e.venue || '') + '</span>' + (e.impact ? ' <span class="pill warn">' + esc(e.impact) + '</span>' : '') + '</span></li>'; }).join('') + '</ul>'; }).join('') : '<p class="status">' + ft('Nothing listed for these two weeks.', 'Nada en estas dos semanas.') + '</p>'));
+        };
+        vEvents.__ro = true;
+      }
+      if (typeof vSuggest === 'function' && !vSuggest.__mgr) {
+        var sg0 = vSuggest;
+        vSuggest = function (days) { return adm() ? sg0(days) : ''; };
+        vSuggest.__mgr = true;
+      }
       var LAYOUT_CSS = '.lrows.x-split{grid-template-columns:1fr 1fr;align-items:start;gap:14px}.x-lcol{display:grid;gap:8px;min-width:0}.x-lcol .x-rh{margin:0 0 2px}@media (max-width:640px){.lrows.x-split{grid-template-columns:1fr}}.x-pair{align-items:start}.x-pair>details{align-self:start;margin:0}';
       var st2 = document.createElement('style'); st2.textContent = LAYOUT_CSS + '.x-rh{font:700 13px var(--f-mono,monospace);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}'; document.head.appendChild(st2);
       var r0 = render;
