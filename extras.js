@@ -207,9 +207,7 @@
           'Margaritas batched to par for the night, labeled and dated',
           'Ice wells full at open',
           'Phones away. No sitting or eating at the bar. Slow moment? Prep or restock']]);
-        /* The rush starts around 10 PM, so the ice gets topped off at 9, before it hits. */
-        LISTS.bar_open.push(['During service', [
-          '9 PM: top off all the ice before the 10 PM rush']]);
+        /* The 9 PM ice top-off before the 10 PM rush now lives on the Host / Busser mid shift list (foh.html, host_mid). */
         LISTS.bar_close.push(['Set up tomorrow', [
           'Margarita batch level noted so the opener knows how much to batch']]);
         LISTS.host_open.push(['Before doors open', [
@@ -397,8 +395,8 @@
         else { var x = document.getElementById('fwho-txt'); if (!x || !x.value.trim()) { if (x) x.focus(); return; } setNames(names.concat([x.value.trim()])); }
       }, true);
       document.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target && e.target.id === 'fwho-txt' && e.target.value.trim()) { e.preventDefault(); setNames(fnames().concat([e.target.value.trim()])); } });
-      /* 9 PM ice alert for the bar: a banner and a chime until the 9 PM top-off is ticked; red and chiming again after 9:15. */
-      var ICE_ID = 'bar_open_' + LISTS.bar_open.findIndex(function (s) { return s[0] === 'During service'; }) + '_0';
+      /* 9 PM ice alert: a banner and a chime until the 9 PM top-off (Host / Busser mid shift) is ticked; red and chiming again after 9:15. */
+      var ICE_ID = (function () { var L = (LISTS.host_mid || []); for (var si = 0; si < L.length; si++) { var ii = L[si][1].findIndex(function (x) { return /^9 PM: top off/.test(x); }); if (ii >= 0) return 'host_mid_' + si + '_' + ii; } return 'host_mid_1_0'; })();
       runAlerts([{
         key: 'ice', at: '21:00', late: '21:15', until: '23:00',
         text: ft('9 PM: top off all the ice before the 10 PM rush', '9 PM: rellena todo el hielo antes de la hora pico de las 10'),
@@ -507,15 +505,32 @@
     return '<section class="card edge x-prep"><div class="cardhead"><h3>Extra prep</h3><span class="count">' + nDone + ' ' + t('of', 'de') + ' ' + items.length + '</span></div>' +
       '<ul class="checks plist">' + rows + '</ul></section>';
   }
+  /* Square tiles with a line icon for the extra prep menu (Eric, Nov 1 2026). The icon is picked from the item's name. */
+  var XP_ICONS = {
+    jar: '<path d="M8 3h8v3H8z"/><path d="M7 6h10l1 3v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9z"/><path d="M6 12h12"/>',
+    drum: '<path d="M14.5 3.5a5 5 0 0 1 3.5 8.5l-4 4-4.5-4.5 4-4a5 5 0 0 1 1-4z"/><path d="M9.5 11.5l-4 4a1.8 1.8 0 1 0 2.5 2.5l.5.5a1.6 1.6 0 1 0 2.3-2.3l-.3-.2 2-2"/>',
+    pan: '<rect x="2.5" y="8" width="15" height="9" rx="1.5"/><path d="M17.5 12.5H22"/><path d="M5.5 11h9"/>',
+    stick: '<rect x="2.5" y="8.5" width="19" height="7" rx="1.5"/><path d="M8 8.5v7"/><path d="M13 8.5v7"/>',
+    leaf: '<path d="M5 19C5 10 11 5 20 4c-.5 9-6 15-15 15z"/><path d="M5 19l9-9"/>',
+    wedge: '<path d="M3 17l14-9 4 3v6z"/><path d="M3 17h18"/><circle cx="12" cy="14" r="1"/><circle cx="16.5" cy="13" r=".8"/>',
+    fries: '<path d="M6 11h12l-1.5 10h-9z"/><path d="M8 11V4M11 11V3M14 11V4M16.5 11V6"/>',
+    bowl: '<path d="M3 11h18a9 9 0 0 1-18 0z"/><path d="M8.5 7.5c0-1.4.9-2.1 1.8-3M13 7.5c0-1.4.9-2.1 1.8-3"/>'
+  };
+  function xpIcon(name) {
+    var n = String(name || '').toLowerCase(), k = /sauce|ranch|salsa|dressing|honey|aioli|macha/.test(n) ? 'jar' : /chicken|brine|tender|thigh|wing/.test(n) ? 'drum' :
+      /dough|shell|pan\b|pans/.test(n) ? 'pan' : /butter/.test(n) ? 'stick' : /onion|jalape|veg|cilantro|basil|lettuce|pickle|pepper|tomato|lime/.test(n) ? 'leaf' :
+      /cheese|mozz|parm|ricotta|queso/.test(n) ? 'wedge' : /fries|fry/.test(n) ? 'fries' : 'bowl';
+    return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + XP_ICONS[k] + '</svg>';
+  }
   function xpMenu() {
     var on = xpToday(), ed = xpEd(), rest = xpItems().filter(function (x) { return !on[x.id]; });
     var chips = rest.map(function (x) {
-      return '<span style="display:inline-flex;align-items:center;gap:2px"><button type="button" class="btn" data-xprep-on="' + esc(x.id) + '">' + esc(x.name) + '</button>' +
-        (ed && ui.xpEdit ? '<button type="button" class="btn x" data-xprep-del="' + esc(x.id) + '" aria-label="' + t('Remove from menu', 'Quitar del men\u00fa') + '">\u00d7</button>' : '') + '</span>';
+      return '<div class="xp-tw"><button type="button" class="xp-tile" data-xprep-on="' + esc(x.id) + '">' + xpIcon(x.name) + '<span>' + esc(x.name) + '</span></button>' +
+        (ed && ui.xpEdit ? '<button type="button" class="xp-x" data-xprep-del="' + esc(x.id) + '" aria-label="' + t('Remove from menu', 'Quitar del men\u00fa') + '">\u00d7</button>' : '') + '</div>';
     }).join('');
     return '<section class="card x-prep-menu"><div class="cardhead"><h3>' + t('Add extra prep', 'Agregar prep extra') + '</h3><span class="count">' + (rest.length ? rest.length + ' ' + t('in the menu', 'en el men\u00fa') : t('All on the list', 'Todo en la lista')) + '</span></div>' +
       '<p class="status">' + t('Tap an item to put it on today\u2019s list.', 'Toca un art\u00edculo para ponerlo en la lista de hoy.') + '</p>' +
-      (chips ? '<div class="chips">' + chips + '</div>' : '') +
+      (chips ? '<div class="xp-tiles">' + chips + '</div>' : '') +
       (ed ? '<div class="padd" style="margin-top:10px"><input type="text" id="xprep-name" placeholder="' + t('New menu item', 'Nuevo art\u00edculo del men\u00fa') + '" autocomplete="off" autocapitalize="sentences">' +
         '<button type="button" class="btn primary" data-xprep-add="1">' + t('Add to menu', 'Agregar al men\u00fa') + '</button>' +
         '<button type="button" class="btn" data-xprep-edit="1">' + (ui.xpEdit ? t('Done editing', 'Listo') : t('Edit menu', 'Editar men\u00fa')) + '</button></div>' : '') + '</section>';
@@ -784,7 +799,12 @@
       '.x86-panel{position:relative;width:min(100%,520px);max-height:calc(100vh - 90px);overflow:auto;border-radius:14px}.x86-panel .card{margin:0}' +
       '.x86-x{position:absolute;top:10px;right:10px;z-index:1;width:36px;height:36px;border-radius:999px;border:1px solid var(--line,#ccc);background:var(--surface,#fff);color:var(--ink,#18181B);font-size:20px;line-height:1;cursor:pointer}.x86-panel .cardhead{padding-right:44px}' +
       /* Side-by-side cards: a folded card shrinks to its title instead of stretching to its neighbour's height. */
-      '.grid>details.fold{align-self:start}';
+      '.grid>details.fold{align-self:start}' +
+      '.xp-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}@media (min-width:700px){.xp-tiles{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}}' +
+      '.xp-tw{position:relative}.xp-tile{appearance:none;width:100%;aspect-ratio:1;max-height:118px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px 8px;border:1px solid var(--line,#ccc);border-radius:14px;background:var(--surface,#fff);color:var(--ink,#18181B);cursor:pointer;font:600 13px/1.2 var(--f-body,system-ui);text-align:center;transition:background .2s,border-color .2s}' +
+      '.xp-tile svg{color:var(--cherry,#8B1E1E)}.xp-tile span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}.xp-tile:hover{border-color:var(--cherry,#8B1E1E)}' +
+      '.xp-tile.flash{background:var(--good,#1F7A4D);border-color:var(--good,#1F7A4D);color:#fff}.xp-tile.flash svg{color:#fff}' +
+      '.xp-x{position:absolute;top:-6px;right:-6px;width:28px;height:28px;border-radius:999px;border:1px solid var(--bad,#B3261E);background:var(--surface,#fff);color:var(--bad,#B3261E);font:700 16px/1 system-ui;cursor:pointer}';
     document.head.appendChild(st);
     S.e86 = S.e86 || {}; S.xprep = S.xprep || {}; S.inv = S.inv || {}; S.invitems = S.invitems || {};
     if (VIEWS.inventory) VIEWS.inventory = invView;
@@ -876,7 +896,7 @@
       if (b.dataset.invDone) { var ar = b.dataset.invDone, nn = names(); if (nn.length > 1) askWho(nn, t('Who counted?', '\u00bfQui\u00e9n cont\u00f3?'), function (n) { if (n) invDone(ar, n); }); else invDone(ar, nn[0] || ''); return; }
       if (b.dataset.xprepAdd) { xpAdd(); return; }
       if (b.dataset.xprepDel) { xpDel(b.dataset.xprepDel); return; }
-      if (b.dataset.xprepOn) { xpSetDay(b.dataset.xprepOn, true); return; }
+      if (b.dataset.xprepOn) { var xid = b.dataset.xprepOn; b.classList.add('flash'); b.disabled = true; setTimeout(function () { xpSetDay(xid, true); }, 260); return; }
       if (b.dataset.xprepOff) { xpSetDay(b.dataset.xprepOff, false); return; }
       if (b.dataset.xprepEdit) { ui.xpEdit = !ui.xpEdit; render(); return; }
       if (b.dataset.x86 === 'open') { x86Open(); return; }
