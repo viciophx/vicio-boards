@@ -379,8 +379,24 @@
       ['today', 'lists'].forEach(function (k) { var v = VIEWS[k]; if (typeof v === 'function') VIEWS[k] = function () { return card() + v.apply(this, arguments) + closeCard(closeOpts); }; });
       (function watchClose() { if (typeof db === 'undefined' || !db) return setTimeout(watchClose, 300); watchDoc('closeout/' + svcDate(), function (x) { S.xclose = S.xclose || {}; S.xclose[svcDate()] = x && x.at ? x : null; render(); }); })();
       document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-xclose]'); if (!b) return; e.preventDefault(); e.stopImmediatePropagation(); closeNight(closeOpts); }, true);
+      /* Today: the Lists card in two columns, Host / Busser on the left and Bartender on the right, open, mid shift and
+         close in order down each side; Notes for the next shift sits beside the Night report. Rearranged after each draw,
+         so the board's own page stays as it is. */
+      function todayLayout() {
+        if (ui.tab !== 'today' || ui.mode === 'service') return;
+        var lr = document.querySelector('#view .lrows');
+        if (lr && !lr.classList.contains('x-split')) {
+          var rows = Array.prototype.slice.call(lr.querySelectorAll('.lrow'));
+          var col = function (side, label) { var c = document.createElement('div'); c.className = 'x-lcol'; c.innerHTML = '<h4 class="x-rh">' + label + '</h4>'; rows.filter(function (b) { return b.dataset.v === side; }).forEach(function (b) { c.appendChild(b); }); return c; };
+          lr.classList.add('x-split'); lr.appendChild(col('host', ft('Host / Busser', 'Host / Busser'))); lr.appendChild(col('bar', ft('Bartender', 'Bartender')));
+        }
+        var nt = document.querySelector('#view details[data-fold="notes"]'), nr = document.querySelector('#view details[data-fold="night"]');
+        if (nt && nr && !nt.parentNode.classList.contains('x-pair')) { var g = document.createElement('div'); g.className = 'grid x-pair'; nr.parentNode.insertBefore(g, nr); g.appendChild(nt); g.appendChild(nr); }
+      }
+      var LAYOUT_CSS = '.lrows.x-split{grid-template-columns:1fr 1fr;align-items:start;gap:14px}.x-lcol{display:grid;gap:8px;min-width:0}.x-lcol .x-rh{margin:0 0 2px}@media (max-width:640px){.lrows.x-split{grid-template-columns:1fr}}.x-pair{align-items:start}.x-pair>details{align-self:start;margin:0}';
+      var st2 = document.createElement('style'); st2.textContent = LAYOUT_CSS + '.x-rh{font:700 13px var(--f-mono,monospace);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}'; document.head.appendChild(st2);
       var r0 = render;
-      render = function () { r0.apply(this, arguments); try { rosterCols(); annotate(); nameChips(fnames().join(' + '), 'data-fwho', ft('Tap to add or switch people', 'Toca para agregar o cambiar personas')); } catch (e) {} };
+      render = function () { r0.apply(this, arguments); try { todayLayout(); rosterCols(); annotate(); nameChips(fnames().join(' + '), 'data-fwho', ft('Tap to add or switch people', 'Toca para agregar o cambiar personas')); } catch (e) {} };
       /* A tap and the name go out together, at once, so a box never flips back while it saves. */
       function saveTick(path, id, on, nm) {
         var patch = { done: {} }; patch.done[id] = on;
