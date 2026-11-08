@@ -8,13 +8,13 @@
      until the guest is reached, with how the guest wants to hear back.
      Text opens the phone's own messages with the ready time typed in, sent from the shop phone; Texted logs it.
      Call shows the number large with Called / No answer. No guest reply: the card stays open and turns yellow after about 10 minutes.
-     An order the kitchen has not accepted after a few minutes escalates here, red, with a sound. */
+     An order the kitchen has not accepted after 5 minutes escalates here: the card blinks red, with a sound every 20 seconds. */
 (function () {
   if (window.__vicioOrders) return;
   window.__vicioOrders = true;
   var BOARD = window.VICIO_BOARD || (/foh/i.test(location.pathname) ? 'foh' : 'kitchen');
   var KITCHEN = BOARD !== 'foh';
-  var SET = { wait: 25, paused: false, pausedMsg: '', escalate: 4, yellow: 10 };
+  var SET = { wait: 25, paused: false, pausedMsg: '', escalate: 5, yellow: 10 };
   var orders = {}, open = false, soundOn = false, ctx = null, heard = {}, lastBeep = 0, sub = null, subSet = null, wake = null;
   var pend = {};   /* the Accept or Decline picker that is open on a card */
 
@@ -97,6 +97,9 @@
   var CSS = '#vo-fab{position:fixed;right:max(14px,env(safe-area-inset-right,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:2147483000;appearance:none;border:0;border-radius:999px;padding:12px 18px;min-height:52px;font:700 15px var(--f-display,system-ui);letter-spacing:.06em;text-transform:uppercase;background:var(--surface,#1B1B1F);color:var(--ink,#EDEDF0);box-shadow:0 6px 24px rgba(0,0,0,.35);border:1px solid var(--line,#2E2E34);cursor:pointer;display:flex;gap:8px;align-items:center}' +
     '#vo-fab.hot{background:var(--cherry,#C4161C);color:#fff;border-color:transparent;animation:vo-p 1.2s infinite}#vo-fab b{background:rgba(0,0,0,.25);border-radius:999px;padding:1px 9px}' +
     '@keyframes vo-p{50%{transform:scale(1.06)}}@media (prefers-reduced-motion:reduce){#vo-fab.hot{animation:none}}' +
+    /* Not accepted after 5 minutes: the card and the Orders button blink until the kitchen accepts. */
+    '#vo .vo-c.blink{animation:vo-bl 1s steps(1,end) infinite}@keyframes vo-bl{50%{background:var(--bad,#D93A3A);border-color:#fff}}' +
+    '#vo-fab.blink{animation:vo-bl2 1s steps(1,end) infinite}@keyframes vo-bl2{50%{background:#fff;color:var(--cherry,#C4161C)}}' +
     '#vo{position:fixed;inset:0;z-index:2147483001;background:var(--bg,#111113);color:var(--ink,#EDEDF0);overflow:auto;font-family:var(--f-body,system-ui);-webkit-overflow-scrolling:touch}' +
     '#vo .vo-w{max-width:1100px;margin:0 auto;padding:calc(12px + env(safe-area-inset-top,0px)) max(14px,env(safe-area-inset-right,0px)) 90px max(14px,env(safe-area-inset-left,0px));display:grid;gap:14px}' +
     '#vo .vo-top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--bg,#111113);padding:8px 0;z-index:2;border-bottom:1px solid var(--line,#2E2E34)}' +
@@ -131,7 +134,8 @@
     var b = document.getElementById('vo-fab'); if (!b) return;
     var act = list().filter(function (o) { return KITCHEN ? o.st === 'new' || o.st === 'accepted' : !/done|canceled/.test(o.st) && !(o.st === 'declined' && o.reach); });
     var hot = list().some(needs);
-    b.className = hot ? 'hot' : ''; b.hidden = open;
+    var late = list().some(function (o) { return o.st === 'new' && mins(o.created) >= SET.escalate; });
+    b.className = (hot ? 'hot' : '') + (late ? ' blink' : ''); b.hidden = open;
     b.innerHTML = t('Online orders', 'Pedidos en línea') + (act.length ? ' <b>' + act.length + '</b>' : '');
   }
   function setOpen(v) { open = v; var p = document.getElementById('vo'); if (p) p.hidden = !v; if (v) keepAwake(); draw(); }
@@ -176,7 +180,7 @@
         acts = '<div class="vo-row"><button type="button" class="vo-b go big" data-vo="acc" data-id="' + o.id + '">' + t('Accept', 'Aceptar') + '</button>' +
           '<button type="button" class="vo-b no big" data-vo="dec" data-id="' + o.id + '">' + t('Decline', 'Rechazar') + '</button></div>';
       }
-      return '<div class="vo-c ' + (late ? 'esc' : 'new') + '">' + head + '<div class="vo-tm' + (late ? ' late' : '') + '" data-ago="' + o.created + '">' + ago(o.created) + '</div></div>' +
+      return '<div class="vo-c ' + (late ? 'esc blink' : 'new') + '">' + head + '<div class="vo-tm' + (late ? ' late' : '') + '" data-ago="' + o.created + '">' + ago(o.created) + '</div></div>' +
         (late ? '<p class="vo-mute">' + t('Waiting too long. FOH has been told.', 'Lleva mucho esperando. FOH ya fue avisado.') + '</p>' : '') + items(o) + acts + '</div>';
     }
     if (o.st === 'accepted') {
@@ -196,7 +200,7 @@
       return '<div class="vo-c wait">' + head + '<div class="vo-tm">' + ago(o.created) + '</div></div><p class="vo-mute">' + t('Waiting for the kitchen to accept. It turns yellow when they do.', 'Esperando que cocina acepte. Se pone amarillo cuando acepten.') + '</p>' + items(o) + '</div>';
     }
     if (o.st === 'new') {
-      return '<div class="vo-c esc">' + head + '<div class="vo-tm late">' + ago(o.created) + '</div></div><p><b>' + t('The kitchen has not accepted this yet. Go tell them.', 'La cocina no lo ha aceptado. Avísales.') + '</b></p>' + items(o) + '</div>';
+      return '<div class="vo-c esc blink">' + head + '<div class="vo-tm late">' + ago(o.created) + '</div></div><p><b>' + t('The kitchen has not accepted this yet. Go tell them.', 'La cocina no lo ha aceptado. Avísales.') + '</b></p>' + items(o) + '</div>';
     }
     var call = o.contact === 'call', reached = o.reach, waitedMin = reached ? mins(reached.at) : 0;
     var yel = o.st !== 'declined' && ((o.st === 'accepted' && !reached) || (reached && !o.confirmed && waitedMin >= SET.yellow));
