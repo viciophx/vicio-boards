@@ -4,7 +4,8 @@
 
    BOH (kitchen screen): every new order with a sound and a waiting timer; Accept with a ready time, or Decline with the problem.
      Also the wait estimate the guest page shows and a Pause switch for online orders.
-   FOH (confirmation): orders the kitchen accepted, "accepted, awaiting payment", with how the guest wants to hear back.
+   FOH (confirmation): every order the moment it lands (dashed, waiting for the kitchen), yellow once the kitchen accepts
+     until the guest is reached, with how the guest wants to hear back.
      Text opens the phone's own messages with the ready time typed in, sent from the shop phone; Texted logs it.
      Call shows the number large with Called / No answer. No guest reply: the card stays open and turns yellow after about 10 minutes.
      An order the kitchen has not accepted after a few minutes escalates here, red, with a sound. */
@@ -82,6 +83,8 @@
     var fresh = list().filter(function (o) { return needs(o) && !heard[o.id + o.st]; });
     fresh.forEach(function (o) { heard[o.id + o.st] = 1; });
     if (fresh.length) { beep(!KITCHEN && fresh.some(function (o) { return o.st === 'new'; }) ? 'esc' : KITCHEN ? 'new' : 'foh'); if (!open) setOpen(true); }
+    /* FOH also sees a brand-new order right away, quietly: the screen opens, no sound until the kitchen accepts or the order escalates. */
+    if (!KITCHEN) { var seen = list().filter(function (o) { return o.st === 'new' && !heard['n' + o.id]; }); seen.forEach(function (o) { heard['n' + o.id] = 1; }); if (seen.length && !open) setOpen(true); }
   }
   /* Keep ringing every 20 seconds while something waits, so a busy line still hears it. */
   setInterval(function () {
@@ -104,7 +107,7 @@
     '#vo .vo-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}' +
     '#vo .vo-cards{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr));align-items:start}' +
     '#vo .vo-c{background:var(--surface,#1B1B1F);border:2px solid var(--line,#2E2E34);border-radius:14px;padding:14px;display:grid;gap:10px}' +
-    '#vo .vo-c.new{border-color:var(--cherry,#E0575A)}#vo .vo-c.esc{border-color:var(--bad,#FF6B6B);background:var(--bad-soft,#3C1B18)}#vo .vo-c.yel{border-color:var(--warn,#F0A43A);background:var(--warn-soft,#33240F)}#vo .vo-c.ok{border-color:var(--good,#4CC38A)}' +
+    '#vo .vo-c.new{border-color:var(--cherry,#E0575A)}#vo .vo-c.esc{border-color:var(--bad,#FF6B6B);background:var(--bad-soft,#3C1B18)}#vo .vo-c.yel{border-color:var(--warn,#F0A43A);background:var(--warn-soft,#33240F)}.vo-c.wait{border-style:dashed;opacity:.85}#vo .vo-c.ok{border-color:var(--good,#4CC38A)}' +
     '#vo .vo-h{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}#vo .vo-h b{font:700 22px var(--f-display,system-ui);text-transform:uppercase;letter-spacing:.02em}' +
     '#vo .vo-tm{font:700 22px var(--f-mono,ui-monospace,monospace);font-variant-numeric:tabular-nums;white-space:nowrap}#vo .vo-tm.late{color:var(--bad,#FF6B6B)}' +
     '#vo .vo-st{font:700 12px var(--f-mono,ui-monospace,monospace);letter-spacing:.08em;text-transform:uppercase;color:var(--muted,#A1A1AA)}' +
@@ -189,11 +192,14 @@
   }
   function fohCard(o) {
     var head = '<div class="vo-h"><div><b>#' + h(o.code) + ' · ' + h(o.name) + '</b><div class="vo-st">' + h(stName(o)) + (o.readyHM && o.st !== 'declined' ? ' · ' + t('ready ', 'listo ') + h(o.readyHM) : '') + ' · $' + h(o.total) + '</div></div>';
+    if (o.st === 'new' && mins(o.created) < SET.escalate) {
+      return '<div class="vo-c wait">' + head + '<div class="vo-tm">' + ago(o.created) + '</div></div><p class="vo-mute">' + t('Waiting for the kitchen to accept. It turns yellow when they do.', 'Esperando que cocina acepte. Se pone amarillo cuando acepten.') + '</p>' + items(o) + '</div>';
+    }
     if (o.st === 'new') {
       return '<div class="vo-c esc">' + head + '<div class="vo-tm late">' + ago(o.created) + '</div></div><p><b>' + t('The kitchen has not accepted this yet. Go tell them.', 'La cocina no lo ha aceptado. Avísales.') + '</b></p>' + items(o) + '</div>';
     }
     var call = o.contact === 'call', reached = o.reach, waitedMin = reached ? mins(reached.at) : 0;
-    var yel = reached && !o.confirmed && waitedMin >= SET.yellow && o.st !== 'declined';
+    var yel = o.st !== 'declined' && ((o.st === 'accepted' && !reached) || (reached && !o.confirmed && waitedMin >= SET.yellow));
     var how = '<span class="vo-how">' + (call ? t('Wants a CALL', 'Quiere LLAMADA') + (o.callTime ? ' · ' + h(o.callTime) : '') : t('Wants a TEXT', 'Quiere MENSAJE')) + '</span>';
     var ph = '<a target="_blank" rel="noopener" class="vo-ph" href="tel:+1' + h(o.digits) + '">' + h(o.phone) + '</a>';
     var acts = '';
@@ -249,8 +255,8 @@
       var waitK = L.filter(function (o) { return o.st === 'new' && mins(o.created) < SET.escalate; });
       var past = L.filter(function (o) { return /done|canceled/.test(o.st) || (o.st === 'declined' && o.reach); }).reverse().slice(0, 10);
       body = (esc.length ? '<h3>' + t('Kitchen has not accepted', 'Cocina no ha aceptado') + '</h3><div class="vo-cards">' + esc.map(fohCard).join('') + '</div>' : '') +
+        (waitK.length ? '<h3>' + t('Just in, waiting for the kitchen', 'Reci\u00e9n llegados, esperando a cocina') + ' (' + waitK.length + ')</h3><div class="vo-cards">' + waitK.map(fohCard).join('') + '</div>' : '') +
         '<h3>' + t('Accepted, awaiting payment', 'Aceptados, falta pagar') + ' (' + live.length + ')</h3>' + (live.length ? '<div class="vo-cards">' + live.map(fohCard).join('') + '</div>' : '<p class="vo-empty">' + t('Nothing to confirm.', 'Nada que confirmar.') + '</p>') +
-        (waitK.length ? '<p class="vo-mute">' + waitK.length + ' ' + t('waiting for the kitchen to accept.', 'esperando que cocina acepte.') + '</p>' : '') +
         (past.length ? '<h3>' + t('Closed tonight', 'Cerrados esta noche') + '</h3><div class="vo-cards">' + past.map(function (o) { return '<div class="vo-c"><div class="vo-h"><div><b>#' + h(o.code) + ' · ' + h(o.name) + '</b><div class="vo-st">' + h(stName(o)) + ' · $' + h(o.total) + '</div></div></div></div>'; }).join('') + '</div>' : '');
     }
     p.innerHTML = '<div class="vo-w">' + top + body + '</div>';
