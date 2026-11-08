@@ -263,6 +263,64 @@
       var st = document.createElement('style');
       st.textContent = '.x-by{display:inline-block;margin-left:8px;padding:1px 7px;letter-spacing:.04em;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font:600 11px var(--f-body,system-ui)}.byline{display:none!important}.x-signin .chips .btn{min-height:44px;font-size:16px}.x-tag{display:inline-flex;align-items:center;gap:4px;padding:4px 6px 4px 12px;border-radius:999px;background:var(--cherry-soft,rgba(139,30,30,.12));color:var(--cherry,#8B1E1E);font-weight:600}.x-tag .btn.x{min-height:30px;padding:0 8px}' + WHO_CSS;
       document.head.appendChild(st);
+
+      /* Expo on the Training page: what runs out with each dish, and the table numbers. The run matrix is a starting draft
+         from the menu; managers edit it on the board and it is stored in the shared sheet at expo/matrix. Table numbers come
+         from the Reservations floor plan (seating/layout), so they always match the map. */
+      var EXPO_DEF = [
+        ['Any pizza', '1 plate per guest, pizza spatula, napkins. Parm and chile flake shakers if the table has none'],
+        ['Seasoned Waffle Fries', 'Ketchup'],
+        ['Garlic Bread', 'Red sauce on the side'],
+        ['Green Chile Mozz Sticks', 'Red sauce on the side'],
+        ['Fried Pickles', 'Ranch'],
+        ['Buffalo Baddies', 'Ranch, extra napkins'],
+        ['Wings', 'Ranch, wet naps, empty plate for bones, extra napkins'],
+        ['The Side Chicks', 'Fries and ranch come on it. Extra napkins'],
+        ['Chicken sandwiches (Basic, La Toxica, Bad Chick)', 'Fries and ranch come on it. Steak knife, napkins'],
+        ['Online pickup order', 'Bag, napkins, plates and forks if asked, sauces on the ticket']];
+      function expoRows() { var m = S.expo && S.expo.rows; return Array.isArray(m) && m.length ? m : EXPO_DEF; }
+      function expoCard() {
+        var ed = typeof mgr === 'function' && mgr(), rows = expoRows(), editing = ed && ui.expoEdit;
+        var body = editing
+          ? rows.map(function (r, i) { return '<div class="padd" style="margin:4px 0"><input type="text" data-expo="' + i + '|0" value="' + esc(r[0]) + '" style="flex:1 1 160px;width:auto"><input type="text" data-expo="' + i + '|1" value="' + esc(r[1]) + '" style="flex:2 1 240px;width:auto"><button type="button" class="btn x" data-expo-del="' + i + '" aria-label="Remove">\u00d7</button></div>'; }).join('') +
+            '<div class="padd" style="margin-top:8px"><button type="button" class="btn" data-expo-add="1">' + ft('Add a dish', 'Agregar platillo') + '</button><button type="button" class="btn primary" data-expo-save="1">' + ft('Save', 'Guardar') + '</button></div>'
+          : '<div class="tablewrap"><table style="min-width:0"><thead><tr><th>' + ft('When this goes out', 'Cuando sale esto') + '</th><th>' + ft('Run it with', 'Ll\u00e9valo con') + '</th></tr></thead><tbody>' +
+            rows.map(function (r) { return '<tr><td><b>' + esc(r[0]) + '</b></td><td>' + esc(r[1]) + '</td></tr>'; }).join('') + '</tbody></table></div>';
+        return '<section class="card" id="x-expo"><div class="cardhead"><h3>' + ft('Expo: what runs with what', 'Expo: qu\u00e9 se lleva con qu\u00e9') + '</h3>' +
+          (ed ? '<button type="button" class="btn" data-expo-edit="1">' + (editing ? ft('Cancel', 'Cancelar') : ft('Edit', 'Editar')) + '</button>' : '') + '</div>' +
+          (S.expo && S.expo.rows ? '' : '<p class="status">' + ft('Starting draft from the menu. A manager confirms it with Edit.', 'Borrador inicial del men\u00fa. Un gerente lo confirma con Editar.') + '</p>') +
+          '<p class="status">' + ft('Every plate leaves the window with what it needs. Check the ticket for extra sauces before you walk.', 'Cada plato sale de la ventana con lo que necesita. Revisa el ticket por salsas extra antes de caminar.') + '</p>' + body + '</section>';
+      }
+      function tablesCard(folded) {
+        var list = (S.layout && S.layout.tables) || [], areas = ['Inside', 'Bar', 'Patio'];
+        var by = areas.map(function (a) { return [a, list.filter(function (t) { return t.area === a; }).sort(function (x, y) { return String(x.n).localeCompare(String(y.n), undefined, { numeric: true }); })]; }).filter(function (g) { return g[1].length; });
+        var inner = by.length ? by.map(function (g) {
+          return '<div style="margin:6px 0"><div class="status" style="font-weight:700;text-transform:uppercase;letter-spacing:.08em">' + esc(g[0]) + '</div><div class="chips">' +
+            g[1].map(function (t) { return '<span class="x-tag" style="padding:6px 12px;font-size:17px">' + esc(t.n) + (t.seats ? ' <small style="font-weight:400">\u00b7 ' + t.seats + '</small>' : '') + '</span>'; }).join('') + '</div></div>';
+        }).join('') + '<p class="status">' + ft('Number and seats. The map with positions is on Reservations.', 'N\u00famero y lugares. El mapa con posiciones est\u00e1 en Reservaciones.') + '</p>'
+          : '<p class="status">' + ft('No tables set up yet. A manager adds them on Reservations, Floor plan; they show here and on the map.', 'A\u00fan no hay mesas. Un gerente las agrega en Reservaciones, Plano; se ven aqu\u00ed y en el mapa.') + '</p>';
+        return '<details class="card fold x-tables"' + (folded ? '' : ' open') + '><summary class="cardhead"><h3>' + ft('Table numbers', 'N\u00fameros de mesa') + '</h3><span class="count">' + list.length + '</span></summary>' + inner + '</details>';
+      }
+      S.expo = S.expo || null;
+      (function watchExpo() { if (typeof db === 'undefined' || !db) return setTimeout(watchExpo, 300); watchDoc('expo/matrix', function (d) { S.expo = d && d.rows ? d : null; if (ui.tab === 'training' && !ui.expoEdit) render(); }); })();
+      if (typeof VIEWS.training === 'function' && !VIEWS.training.__expo) {
+        var tr0 = VIEWS.training;
+        VIEWS.training = function () { var html = tr0.apply(this, arguments); return (typeof tq !== 'undefined' && tq.items && tq.items.length) || ui.trk ? html : tablesCard(false) + expoCard() + html; };
+        VIEWS.training.__expo = true;
+      }
+      ['today', 'service'].forEach(function (k) { var v = VIEWS[k]; if (typeof v === 'function' && !v.__tables) { VIEWS[k] = function () { return v.apply(this, arguments) + tablesCard(true); }; VIEWS[k].__tables = true; } });
+      var expoDraft = null;
+      document.addEventListener('input', function (e) { var x = e.target; if (!x.dataset || !x.dataset.expo) return; var p = x.dataset.expo.split('|'); expoDraft = expoDraft || expoRows().map(function (r) { return r.slice(); }); expoDraft[+p[0]][+p[1]] = x.value; });
+      document.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('[data-expo-edit],[data-expo-add],[data-expo-del],[data-expo-save]'); if (!b) return;
+        e.preventDefault(); e.stopImmediatePropagation();
+        if (b.dataset.expoEdit) { ui.expoEdit = !ui.expoEdit; expoDraft = null; render(); return; }
+        expoDraft = expoDraft || expoRows().map(function (r) { return r.slice(); });
+        if (b.dataset.expoAdd) { expoDraft.push(['', '']); S.expo = { rows: expoDraft }; render(); return; }
+        if (b.dataset.expoDel) { expoDraft.splice(+b.dataset.expoDel, 1); S.expo = { rows: expoDraft }; render(); return; }
+        var rows = expoDraft.filter(function (r) { return (r[0] || '').trim(); });
+        S.expo = { rows: rows }; save('expo/matrix', { rows: rows, by: fnames()[0] || '', at: Date.now() }); ui.expoEdit = false; expoDraft = null; render();
+      }, true);
       var closeOpts = {
         t: ft, es: fes, date: svcDate, names: fnames,
         lists: function (d) { var dn = (S.shift && ui.date === d ? S.shift.done : null) || {}; return ['host_open', 'host_close', 'bar_open', 'bar_close'].map(function (k) { var items = sections(k, d).flatMap(function (s) { return s[1]; }); return { name: (k.indexOf('host') === 0 ? 'Host / Busser ' : 'Bartender ') + (k.slice(-4) === 'open' ? 'open' : 'close'), n: items.length, done: items.filter(function (x) { return dn[x[0]]; }).length }; }); },
@@ -465,6 +523,7 @@
     if (!document.querySelector('.x-prep-menu')) view.insertAdjacentHTML('beforeend', xpMenu());
     if (typeof translateDom === 'function') translateDom();
   }
+
 
   /* Saturday counts, on the board instead of Typeform. Item lists live in the shared sheet at invitems/board
      ({areas:{<area>:{name, items:[{id,name,unit,par,vendor}]}}}); managers edit them here or on Colette's board.
