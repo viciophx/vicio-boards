@@ -192,7 +192,30 @@
     ul.replaceWith(wrap);
   }
   var ROSTER_CSS = '.x-roster{margin:4px 0 12px}.x-roster .x-rh{margin:0 0 6px;font:700 13px var(--f-mono,monospace);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}.x-roster .x-rh span{font-weight:400}.x-roster ul{margin:0}';
-  var WHO_CSS = CLOSE_CSS + ROSTER_CSS + WHO2_CSS + '.x-who{margin-left:auto;font:600 12px var(--f-body,system-ui);color:var(--cherry,#8B1E1E);background:var(--cherry-soft,rgba(139,30,30,.1));border:1px solid currentColor;border-radius:999px;padding:4px 10px;min-height:28px;cursor:pointer;white-space:nowrap}.x-who::before{content:"\u25CF ";font-size:9px;vertical-align:1px}.cardhead{flex-wrap:wrap;gap:6px}';
+  /* Sign-in as one compact row: a pull-down of the roster (own side first), Someone else opens a name box.
+     People already signed in on this device show as small chips with an x. attr is data-fwho (FOH) or data-xwho (BOH). */
+  function whoRow(T, attr, title, signed, ppl) {
+    var opts = '<option value="">' + (signed.length ? T('Add someone\u2026', 'Agregar a alguien\u2026') : T('Pick your name\u2026', 'Elige tu nombre\u2026')) + '</option>' +
+      ppl.map(function (p) { return '<option value="' + esc(p.name) + '">' + esc(p.name) + '</option>'; }).join('') +
+      '<option value="__other">' + T('Someone else\u2026', 'Otra persona\u2026') + '</option>';
+    return '<section class="card x-signin x-compact"><div class="x-row"><b class="x-lbl">' + title + '</b>' +
+      '<select ' + attr + '-sel="1" aria-label="' + title + '">' + opts + '</select>' +
+      '<input type="text" id="' + attr.slice(5) + '-txt" class="x-other" placeholder="' + T('Name', 'Nombre') + '" autocomplete="off" autocapitalize="words" hidden>' +
+      '<button type="button" class="btn primary x-other" ' + attr + '="in" hidden>' + T('Add', 'Agregar') + '</button>' +
+      signed.map(function (n) { return '<span class="x-tag">' + esc(n) + '<button type="button" class="btn x" ' + attr + '="rm" data-name="' + esc(n) + '" aria-label="' + T('Remove', 'Quitar') + ' ' + esc(n) + '">\u00d7</button></span>'; }).join('') +
+      (signed.length ? '<button type="button" class="btn" ' + attr + '="done">' + T('Done', 'Listo') + '</button>' : '') + '</div></section>';
+  }
+  function whoSel(e, attr, add) {
+    var sel = e.target; if (!sel || !sel.hasAttribute || !sel.hasAttribute(attr + '-sel')) return false;
+    var v = sel.value, row = sel.closest('.x-row');
+    if (v === '__other') { row.querySelectorAll('.x-other').forEach(function (x) { x.hidden = false; }); var t = row.querySelector('input.x-other'); if (t) t.focus(); return true; }
+    if (v) add(v);
+    return true;
+  }
+  var COMPACT_CSS = '.x-compact{padding:10px 14px}.x-compact .x-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}.x-compact .x-lbl{font-size:15px;margin-right:4px}' +
+    '.x-compact select{min-height:44px;font-size:16px;padding:8px 10px;border-radius:10px;border:1px solid var(--line,#ccc);background:var(--surface,#fff);color:var(--ink,#18181B);flex:1 1 200px;max-width:320px}' +
+    '.x-compact input.x-other{min-height:44px;flex:1 1 160px;max-width:240px}';
+  var WHO_CSS = COMPACT_CSS + CLOSE_CSS + ROSTER_CSS + WHO2_CSS + '.x-who{margin-left:auto;font:600 12px var(--f-body,system-ui);color:var(--cherry,#8B1E1E);background:var(--cherry-soft,rgba(139,30,30,.1));border:1px solid currentColor;border-radius:999px;padding:4px 10px;min-height:28px;cursor:pointer;white-space:nowrap}.x-who::before{content:"\u25CF ";font-size:9px;vertical-align:1px}.cardhead{flex-wrap:wrap;gap:6px}';
   /* FOH: who is on this device, and their initials on everything they tick. The FOH board already saves the name with each
      tick and clears the sign-in at the next shift; this puts the sign-in on Today and Checklists and shows initials. */
   if (BOARD === 'foh') {
@@ -260,13 +283,7 @@
         if (names.length && !ui.whoEdit) return '';
         var ppl = typeof stPeople === 'function' ? stPeople() : [];
         ppl = ppl.filter(function (p) { return p.group !== 'Kitchen'; }).concat(ppl.filter(function (p) { return p.group === 'Kitchen'; })).filter(function (p) { return names.indexOf(p.name) < 0; });
-        return '<section class="card edge x-signin"><div class="cardhead"><h3>' + (names.length ? ft('On this device', 'En este aparato') : ft('Who is on tonight?', '\u00bfQui\u00e9n est\u00e1 esta noche?')) + '</h3></div>' +
-          (names.length ? '<div class="chips">' + names.map(function (n) { return '<span class="x-tag">' + esc(n) + '<button type="button" class="btn x" data-fwho="rm" data-name="' + esc(n) + '" aria-label="' + ft('Remove', 'Quitar') + ' ' + esc(n) + '">\u00d7</button></span>'; }).join('') + '</div>' : '') +
-          '<p class="status">' + (names.length ? ft('Working off the same iPad? Add the other person too; each tick will ask who did it.', '\u00bfTrabajan en el mismo iPad? Agrega a la otra persona; cada marca preguntar\u00e1 qui\u00e9n la hizo.') : ft('Tap your name so your checks carry it. It clears at the next shift.', 'Toca tu nombre para que tus marcas lo lleven. Se borra en el siguiente turno.')) + '</p>' +
-          '<div class="chips">' + ppl.map(function (p) { return '<button type="button" class="btn" data-fwho="pick" data-name="' + esc(p.name) + '">' + esc(first(p.name)) + '</button>'; }).join('') + '</div>' +
-          '<div class="padd"><input type="text" id="fwho-txt" placeholder="' + ft('Someone else', 'Otra persona') + '" autocomplete="off" autocapitalize="words">' +
-          '<button type="button" class="btn primary" data-fwho="in">' + (names.length ? ft('Add', 'Agregar') : ft('Sign in', 'Entrar')) + '</button>' +
-          (names.length ? '<button type="button" class="btn" data-fwho="done">' + ft('Done', 'Listo') + '</button>' : '') + '</div></section>';
+        return whoRow(ft, 'data-fwho', names.length ? ft('On this device', 'En este aparato') : ft('Who is on tonight?', '\u00bfQui\u00e9n est\u00e1 esta noche?'), names, ppl);
       }
       var byDocs = {}, watched = {};
       function byFor(path) {
@@ -394,6 +411,7 @@
         else if (b.dataset.fwho === 'done') { ui.whoEdit = false; render(); }
         else { var x = document.getElementById('fwho-txt'); if (!x || !x.value.trim()) { if (x) x.focus(); return; } setNames(names.concat([x.value.trim()])); }
       }, true);
+      document.addEventListener('change', function (e) { if (whoSel(e, 'data-fwho', function (n) { setNames(fnames().concat([n])); })) e.stopImmediatePropagation(); }, true);
       document.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target && e.target.id === 'fwho-txt' && e.target.value.trim()) { e.preventDefault(); setNames(fnames().concat([e.target.value.trim()])); } });
       /* 9 PM ice alert: a banner and a chime until the 9 PM top-off (Host / Busser mid shift) is ticked; red and chiming again after 9:15. */
       var ICE_ID = (function () { var L = (LISTS.host_mid || []); for (var si = 0; si < L.length; si++) { var ii = L[si][1].findIndex(function (x) { return /^9 PM: top off/.test(x); }); if (ii >= 0) return 'host_mid_' + si + '_' + ii; } return 'host_mid_1_0'; })();
@@ -644,13 +662,7 @@
     if (nm.length && !ui.whoEdit) return '';
     var ppl = typeof stPeople === 'function' ? stPeople() : [];
     ppl = ppl.filter(function (p) { return p.group === 'Kitchen'; }).concat(ppl.filter(function (p) { return p.group !== 'Kitchen'; })).filter(function (p) { return nm.indexOf(p.name) < 0; });
-    return '<section class="card edge x-signin"><div class="cardhead"><h3>' + (nm.length ? t('On this device', 'En este aparato') : 'Who is checking tonight?') + '</h3></div>' +
-      (nm.length ? '<div class="chips">' + nm.map(function (n) { return '<span class="x-tag">' + esc(n) + '<button type="button" class="btn x" data-xwho="rm" data-name="' + esc(n) + '" aria-label="' + t('Remove', 'Quitar') + ' ' + esc(n) + '">\u00d7</button></span>'; }).join('') + '</div>' : '') +
-      '<p class="status">' + (nm.length ? t('Working off the same iPad? Add the other person too; each tick will ask who did it.', '\u00bfTrabajan en el mismo iPad? Agrega a la otra persona; cada marca preguntar\u00e1 qui\u00e9n la hizo.') : 'Tap your name so your checks and logs carry it.') + '</p>' +
-      '<div class="chips">' + ppl.map(function (p) { return '<button type="button" class="btn" data-xwho="pick" data-name="' + esc(p.name) + '">' + esc(first(p.name)) + '</button>'; }).join('') + '</div>' +
-      '<div class="padd"><input type="text" id="xwho-txt" placeholder="' + t('Someone else', 'Otra persona') + '" autocomplete="off" autocapitalize="words">' +
-      '<button type="button" class="btn primary" data-xwho="in">' + (nm.length ? t('Add', 'Agregar') : 'Sign in') + '</button>' +
-      (nm.length ? '<button type="button" class="btn" data-xwho="done">' + t('Done', 'Listo') + '</button>' : '') + '</div></section>';
+    return whoRow(t, 'data-xwho', nm.length ? t('On this device', 'En este aparato') : t('Who is checking tonight?', '\u00bfQui\u00e9n est\u00e1 marcando esta noche?'), nm, ppl);
   }
 
   /* 86 board, shared with FOH. */
@@ -846,6 +858,7 @@
     }], function () { return iso(new Date()); }, names);
     /* The name rides along with every shift check, next to the tracker's own done flag. */
     document.addEventListener('change', function (e) {
+      if (whoSel(e, 'data-xwho', function (n) { setNames(names().concat([n])); })) { e.stopImmediatePropagation(); return; }
       var inp = e.target; if (!inp || !inp.dataset) return;
       if (inp.dataset.inv) { e.stopImmediatePropagation(); var ip = inp.dataset.inv.split('|'); invSetCount(ip[0], ip[1], inp.value === '' ? null : +inp.value); return; }
       var nms = names();
