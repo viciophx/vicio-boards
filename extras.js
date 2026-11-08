@@ -431,7 +431,56 @@
         vSuggest = function (days) { return adm() ? sg0(days) : ''; };
         vSuggest.__mgr = true;
       }
-      var LAYOUT_CSS = '.lrows.x-split{grid-template-columns:1fr 1fr;align-items:start;gap:14px}.x-lcol{display:grid;gap:8px;min-width:0}.x-lcol .x-rh{margin:0 0 2px}@media (max-width:640px){.lrows.x-split{grid-template-columns:1fr}}.x-pair{align-items:start}.x-pair>details{align-self:start;margin:0}';
+      /* Menu page, food: a simple card like BOH. Photo, what it is, how to sell it, and what Expo sends with it (from the
+         Expo matrix on Training, so a manager's edit there shows here too). The sell lines are a starting draft. */
+      var SELL = {
+        'Margherita': 'The cleanest way to taste our crust: crispy cheese edges, bright red sauce, fresh basil. A great first pizza, or a cool one next to something spicy.',
+        'The Mixtape': 'Can\u2019t decide? Half Margherita, half Pepperoni in one pan. Best pick for a table sharing one pizza.',
+        'Pepperoni': 'Our best seller. The pepperoni cups up and crisps on top, with crispy cheese edges all around.',
+        'Sausage and Pep': 'Pepperoni plus spicy sausage for the meat lovers. Let them know it has a little kick.',
+        'Triple Pepperoni': 'Half a pound of cupping pepperoni. For the pepperoni lover at the table.',
+        'El Infierno': 'Our hottest pie: Scorpion hot honey over pepperoni with cool ricotta. Warn them it is very spicy, then let them be brave.',
+        'La Pi\u00f1a Brava': 'Sweet and spicy: roasted pineapple, roasted jalape\u00f1os, pepperoni and hot honey. Pineapple fans love it.',
+        'La G\u00fcera': 'No red sauce. Garlic parm butter, spicy sausage and ricotta. Rich, for guests who want something different.',
+        'Buffalo Chicken Pizza': 'No red sauce. Crispy chicken, buffalo, gorgonzola and ranch. Like wings on a pizza.',
+        'La Cochina': 'House favorite. Carnitas, pickled onions, queso fresco and salsa macha. Mention the salsa macha has sesame.',
+        'Build Your Own Pizza': 'Start with red sauce and mozzarella and add what they love. Meats +$2, premium meats +$4, toppings +$1.50.',
+        'Seasoned Waffle Fries': 'An easy add for the table while the pizza bakes.',
+        'Garlic Bread': 'Half a pizza base with garlic parm butter and red sauce for dipping. A great starter for two.',
+        'Green Chile Mozz Sticks': 'House made and giant, stuffed with green chile. Three to an order, made for sharing.',
+        'Fried Pickles': 'Hand breaded spears with ranch. Crunchy and salty, perfect with a beer.',
+        'Buffalo Baddies': 'Boneless buffalo bites with ranch. Easy to share, no mess.',
+        'Wings': 'Six bone-in wings in their pick of flavor. Ask which flavor; check with the kitchen for tonight\u2019s list.',
+        'The Side Chicks': 'Three crispy tenders with fries and ranch. The safe pick for kids and picky eaters.',
+        'The Basic Chick Sandwich': 'Crispy chicken thigh, slaw, pickles and buffalo on a sweet bun, with fries.',
+        'La Toxica': 'Our spicy sandwich: extra spicy thigh and roasted jalape\u00f1os. Warn them it is hot.',
+        'The Bad Chick': 'Two crispy thighs stacked. The big one, for real hunger.'
+      };
+      function expoFor(name, group) {
+        var rows = expoRows(), n = name.toLowerCase();
+        var hit = rows.find(function (r) { return r[0].toLowerCase() === n; }) || rows.find(function (r) { return r[0].toLowerCase().indexOf(n) >= 0; });
+        if (!hit && /^pizzas|build your own/i.test(group || '')) hit = rows.find(function (r) { return /pizza/i.test(r[0]) && /any/i.test(r[0]); });
+        if (!hit && /sandwich|toxica|bad chick/i.test(name)) hit = rows.find(function (r) { return /sandwich/i.test(r[0]); });
+        return hit ? hit[1] : '';
+      }
+      var tagPill = function (tg) { return tg ? '<span class="pill ' + (/spicy/i.test(tg) ? 'warn' : /House favorite|Featured/.test(tg) ? 'good' : 'none') + '">' + esc(tg) + '</span>' : ''; };
+      if (typeof foodPreview === 'function' && !foodPreview.__simple) {
+        foodPreview = function (name) {
+          var grp = '', row = null;
+          MENU.forEach(function (x) { x[2].forEach(function (r) { if (r[0] === name) { row = r; grp = x[0]; } }); });
+          if (!row) return '';
+          var g = GUEST[name], img = g ? kitPhoto(g.id) : null, desc = (g && g.sum) || row[3] || '', sell = SELL[name] || '', ex = expoFor(name, grp);
+          var sec = function (h, b) { return b ? '<div class="rsec"><p class="grp">' + h + '</p><p style="font-size:17px;line-height:1.45;margin:0">' + esc(b) + '</p></div>' : ''; };
+          return (img ? '<img class="pimg" src="' + img + '" alt="' + esc(name) + '">' : '<div class="x-noimg">' + ft('No photo yet', 'Sin foto todav\u00eda') + '</div>') +
+            '<div class="cardhead"><h3 style="font-size:24px">' + esc(name) + ' <span class="rp">' + esc(row[1]) + '</span></h3>' + tagPill(g ? g.tag : row[2]) + '</div>' +
+            outNote(name) +
+            (desc ? '<p class="rsum" style="font-size:17px">' + esc(desc) + '</p>' : '') +
+            sec(ft('How to sell it', 'C\u00f3mo venderlo'), sell) +
+            sec(ft('Expo sends it with', 'Expo lo manda con'), ex);
+        };
+        foodPreview.__simple = true;
+      }
+      var LAYOUT_CSS = '.x-noimg{display:grid;place-items:center;height:120px;border:1px dashed var(--line,#ccc);border-radius:12px;color:var(--muted);font-size:14px;margin-bottom:10px}' + '.lrows.x-split{grid-template-columns:1fr 1fr;align-items:start;gap:14px}.x-lcol{display:grid;gap:8px;min-width:0}.x-lcol .x-rh{margin:0 0 2px}@media (max-width:640px){.lrows.x-split{grid-template-columns:1fr}}.x-pair{align-items:start}.x-pair>details{align-self:start;margin:0}';
       var st2 = document.createElement('style'); st2.textContent = LAYOUT_CSS + '.x-rh{font:700 13px var(--f-mono,monospace);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}'; document.head.appendChild(st2);
       var r0 = render;
       render = function () { r0.apply(this, arguments); try { todayLayout(); rosterCols(); foldStaff(); annotate(); nameChips(fnames().join(' + '), 'data-fwho', ft('Tap to add or switch people', 'Toca para agregar o cambiar personas')); } catch (e) {} };
