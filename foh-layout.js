@@ -29,7 +29,7 @@
     var c2 = document.createElement('div'); c2.className = 'x-hc2'; c2.appendChild(sw);
     var c3 = document.createElement('div'); c3.className = 'x-hc3';
     if (bar) { bar.classList.add('x-hbar'); c3.appendChild(bar); }
-    if (sb) { sb.classList.add('x-top'); c3.appendChild(sb); }
+    if (sb) { sb.classList.add('x-top', 'x-mini'); c2.appendChild(sb); }
     row.appendChild(c1); row.appendChild(c2); row.appendChild(c3); hd.insertBefore(row, hd.firstChild); hd.classList.add('x-tight');
     var iceSec = document.querySelector('#view .x-ice');
     var x = (S.ice && typeof S.ice.on === 'boolean') ? S.ice : null, stt = sw.querySelector('.status');
@@ -109,6 +109,11 @@
     '.x-iceswitch .x-isl{display:grid;line-height:1.15}.x-iceswitch .x-isl b{font:700 13px var(--f-mono,monospace);letter-spacing:.06em;text-transform:uppercase}.x-iceswitch .x-isl small{font-size:12px;opacity:.85;white-space:nowrap}' +
     '.x-itrack{position:relative;width:52px;height:30px;border-radius:999px;background:rgba(255,255,255,.28);transition:background .2s;flex:0 0 auto}.x-iknob{position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);transition:left .2s}' +
     '.x-iceswitch.on .x-itrack{background:#4CC38A}.x-iceswitch.on .x-iknob{left:25px}.x-istate{font:800 14px var(--f-body,system-ui);min-width:30px}.modesw.x-icein{flex-wrap:wrap;align-items:center}' +
+'.x-hc2{display:flex!important;flex-wrap:wrap;align-items:center;gap:8px 14px;justify-items:initial}.x-hc2 .modesw{margin:0}' +
+    '.shiftbar.x-mini{display:flex;gap:8px;flex:1 1 300px;min-width:280px;max-width:520px;margin:0}.shiftbar.x-mini .seg{display:grid;gap:3px;flex:1;min-width:0}' +
+    '.shiftbar.x-mini .segbar{height:7px;border-radius:4px}.shiftbar.x-mini .segbar i{border-radius:4px}.shiftbar.x-mini .segleft{display:none}' +
+    '.shiftbar.x-mini .seghead{display:flex;justify-content:space-between;align-items:baseline;gap:4px;flex-wrap:nowrap}.shiftbar.x-mini .seghead b{font-size:12px!important;letter-spacing:.05em;white-space:nowrap}.shiftbar.x-mini .seghead span{font-size:11px!important;white-space:nowrap}' +
+    '.x-iceswitch{min-height:42px!important;padding:4px 12px 4px 14px!important;gap:10px!important}.x-itrack{width:46px!important;height:26px!important}.x-iknob{width:20px!important;height:20px!important}.x-iceswitch.on .x-iknob{left:23px!important}' +
     '.x-expowho{margin-bottom:12px}.x-expowho .x-row{gap:8px}.x-expotop{align-items:start}.x-expotop .svcorders:empty{display:none}' +
     '.x-tgrp{display:flex;gap:10px;align-items:flex-start;margin:6px 0}.x-tgrp>span{flex:0 0 56px;font:700 11px var(--f-mono,monospace);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-top:9px}' +
     '.x-tgrp>div{display:flex;flex-wrap:wrap;gap:6px}.x-tgrp b{display:inline-flex;align-items:baseline;gap:3px;min-width:44px;justify-content:center;padding:6px 10px;border:1px solid var(--line,#2E2E34);border-radius:10px;font:700 19px var(--f-display,system-ui)}.x-tgrp small{font:500 11px var(--f-body,system-ui);color:var(--muted)}' +
@@ -172,7 +177,7 @@
     var c2 = document.createElement('div'); c2.className = 'x-hc2'; c2.appendChild(sw); var stt = sw.querySelector('.status'); if (stt) { var seg = sw.querySelector('.seg2'); if (seg) seg.title = stt.textContent; stt.remove(); } sw.classList.add('x-icein'); sw.insertAdjacentHTML('beforeend', iceSwitchHtml((S.ice && typeof S.ice.on === 'boolean') ? S.ice : null, ft, e, es()));
     var c3 = document.createElement('div'); c3.className = 'x-hc3';
     if (bar) { bar.classList.add('x-hbar'); c3.appendChild(bar); }
-    c3.insertAdjacentHTML('beforeend', strip(ui.date));
+    c2.insertAdjacentHTML('beforeend', strip(ui.date).replace('shiftbar x-top', 'shiftbar x-top x-mini'));
     row.appendChild(c1); row.appendChild(c2); row.appendChild(c3); hd.insertBefore(row, hd.firstChild); hd.classList.add('x-tight');
     var ice = document.querySelector('#view .x-ice'); if (ice) ice.remove();
   }
@@ -203,6 +208,12 @@
     '.x-iceswitch .x-isl{display:grid;line-height:1.15}.x-iceswitch .x-isl b{font:700 13px var(--f-mono,monospace);letter-spacing:.06em;text-transform:uppercase}.x-iceswitch .x-isl small{font-size:12px;opacity:.85;white-space:nowrap}' +
     '.x-itrack{position:relative;width:52px;height:30px;border-radius:999px;background:rgba(255,255,255,.28);transition:background .2s;flex:0 0 auto}.x-iknob{position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);transition:left .2s}' +
     '.x-iceswitch.on .x-itrack{background:#4CC38A}.x-iceswitch.on .x-iknob{left:25px}.x-istate{font:800 14px var(--f-body,system-ui);min-width:30px}.modesw.x-icein{flex-wrap:wrap;align-items:center}' +
+'.x-hc2{display:flex!important;flex-wrap:wrap;align-items:center;gap:8px 14px;justify-items:initial}.x-hc2 .modesw{margin:0}' +
+    '.shiftbar.x-mini{display:flex;gap:8px;flex:1 1 300px;min-width:280px;max-width:520px;margin:0}.shiftbar.x-mini .seg{display:grid;gap:3px;flex:1;min-width:0}' +
+    '.shiftbar.x-mini .segbar{height:7px;border-radius:4px}.shiftbar.x-mini .segbar i{border-radius:4px}.shiftbar.x-mini .segleft{display:none}' +
+    '.shiftbar.x-mini .seghead{display:flex;justify-content:space-between;align-items:baseline;gap:4px;flex-wrap:nowrap}.shiftbar.x-mini .seghead b{font-size:12px!important;letter-spacing:.05em;white-space:nowrap}.shiftbar.x-mini .seghead span{font-size:11px!important;white-space:nowrap}' +
+    '.x-iceswitch{min-height:42px!important;padding:4px 12px 4px 14px!important;gap:10px!important}.x-itrack{width:46px!important;height:26px!important}.x-iknob{width:20px!important;height:20px!important}.x-iceswitch.on .x-iknob{left:23px!important}' +
+    '#head .x-hc2{padding-right:72px}' +
     '.x-djobs li label span{font-size:17px}.x-djobs small{display:block;color:var(--muted);font-size:14px}';
   (function hook() {
     if (typeof render !== 'function' || typeof ui === 'undefined' || typeof S === 'undefined' || typeof MODES === 'undefined' || !document.head) return setTimeout(hook, 150);
