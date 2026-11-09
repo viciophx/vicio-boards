@@ -155,6 +155,22 @@
     if (typeof render !== 'function' || typeof ui === 'undefined' || typeof S === 'undefined' || !document.head) return setTimeout(hook, 150);
     var st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
     setupModes();
+    /* Events near downtown fill in by themselves every morning (apps-script/Events.gs). Read-only for everyone, on the
+       iPads and on Colette's Board: no Add, no Remove, no Find with Claude (Eric, Nov 9). */
+    (function roEvents() {
+      if (typeof vEvents !== 'function' || !vEvents.__ro) return setTimeout(roEvents, 200);
+      if (vEvents.__auto) return;
+      vEvents = function (days) {
+        var all = days.flatMap(function (k) { return evOn(k); }), byDay = days.map(function (k) { return [k, evOn(k)]; }).filter(function (x) { return x[1].length; });
+        return fold('events', ft('Events near downtown', 'Eventos cerca del centro'), all.length ? all.length + ft(' in two weeks', ' en dos semanas') : ft('None listed', 'Ninguno'),
+          '<p class="status">' + ft('Concerts, games, shows and conventions within 2 miles, updated every morning. Expect a rush before and after.', 'Conciertos, partidos, shows y convenciones a 2 millas, actualizado cada ma\u00f1ana. Espera m\u00e1s gente antes y despu\u00e9s.') + '</p>' +
+          (byDay.length ? byDay.map(function (x) { return '<p class="grp">' + e(longDate(x[0])) + '</p><ul class="checks plist">' + x[1].map(function (v) { return '<li><span class="ptime">' + e(v.time || '') + '</span><span><b>' + e(v.title) + '</b> <span class="muted">' + e(v.venue || '') + '</span>' + (v.impact ? ' <span class="pill warn">' + e(v.impact) + '</span>' : '') + '</span></li>'; }).join('') + '</ul>'; }).join('')
+            : '<p class="status">' + ft('Nothing listed for these two weeks.', 'Nada en estas dos semanas.') + '</p>'));
+      };
+      vEvents.__ro = vEvents.__auto = true; render();
+    })();
+    /* Draft next week's schedule is gone from FOH for everyone, managers and Colette's Board included (Eric, Nov 9). */
+    (function noDraft() { if (typeof vSuggest !== 'function' || !vSuggest.__mgr) return setTimeout(noDraft, 200); if (vSuggest.__gone) return; vSuggest = function () { return ''; }; vSuggest.__gone = vSuggest.__mgr = true; render(); })();
     /* Colette's Board can ask the FOH board to open on a page (its reservation count opens Reservations). */
     try { var go = localStorage.getItem('vicio_foh_goto'); if (go && VIEWS[go]) { localStorage.removeItem('vicio_foh_goto'); ui.tab = go; } } catch (err) {}
     (function wrapToday() {
