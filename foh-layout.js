@@ -155,6 +155,8 @@
     if (typeof render !== 'function' || typeof ui === 'undefined' || typeof S === 'undefined' || !document.head) return setTimeout(hook, 150);
     var st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
     setupModes();
+    /* Colette's Board can ask the FOH board to open on a page (its reservation count opens Reservations). */
+    try { var go = localStorage.getItem('vicio_foh_goto'); if (go && VIEWS[go]) { localStorage.removeItem('vicio_foh_goto'); ui.tab = go; } } catch (err) {}
     (function wrapToday() {
       /* Wait for the live add-ons to wrap Today first, so the Expo screen sits outside them. */
       if (!(VIEWS.today && /closeCard/.test(String(VIEWS.today)))) return setTimeout(wrapToday, 150);
@@ -255,6 +257,7 @@
     '.shiftbar.x-mini .seghead{display:flex;justify-content:space-between;align-items:baseline;gap:4px;flex-wrap:nowrap}.shiftbar.x-mini .seghead b{font-size:12px!important;letter-spacing:.05em;white-space:nowrap}.shiftbar.x-mini .seghead span{font-size:11px!important;white-space:nowrap}' +
     '.x-iceswitch{min-height:42px!important;padding:4px 12px 4px 14px!important;gap:10px!important}.x-itrack{width:46px!important;height:26px!important}.x-iknob{width:20px!important;height:20px!important}.x-iceswitch.on .x-iknob{left:23px!important}' +
     '#head .x-hc2{padding-right:72px}' +
+    '.x-invfix{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.x-invfix input,.x-invfix select{min-height:40px;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:500 15px var(--f-body,system-ui)}.x-invfix input[type=text]{flex:2 1 140px}.x-invfix input[data-inv-fix$="|unit"]{flex:1 1 80px}.x-invfix input[type=number]{flex:0 1 80px;width:80px}.x-invfix select{flex:1 1 110px}' +
     '.x-dweek{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin:0 0 12px}@media (max-width:900px){.x-dweek{grid-template-columns:repeat(2,minmax(0,1fr))}}' +
     '.x-dday{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 8px;display:flex;flex-direction:column;gap:6px;min-width:0}.x-dday.today{border:2px solid var(--cherry);box-shadow:0 0 0 3px rgba(139,30,30,.08)}.x-dday.past{opacity:.72}.x-dday.empty{background:transparent}' +
     '.x-ddh{display:flex;align-items:baseline;gap:6px}.x-ddh b{font:700 16px var(--f-display,system-ui);text-transform:uppercase;letter-spacing:.03em}.x-ddh span{color:var(--muted);font-size:13px}.x-ddh i{margin-left:auto;font:600 11px var(--f-mono,monospace);font-style:normal;color:var(--muted)}.x-ddh i.ok{color:var(--good)}' +
@@ -265,12 +268,59 @@
     if (typeof render !== 'function' || typeof ui === 'undefined' || typeof S === 'undefined' || typeof MODES === 'undefined' || !document.head) return setTimeout(hook, 150);
     var st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
     if (!MODES.__dough) { MODES.push(['dough', 'Dough']); MODES.__dough = true; }
+    /* The BOH Schedule page is gone; the Dough schedule page takes its place and shows the same week calendar as Dough. */
+    if (typeof GROUPS !== 'undefined' && !GROUPS.__nocal) { GROUPS.forEach(function (g) { var i = g[1].indexOf('calendar'); if (i >= 0) g[1].splice(i, 1); }); GROUPS.__nocal = true; }
+    if (ui.tab === 'calendar') ui.tab = 'dough';
+    if (VIEWS.dough && !VIEWS.dough.__week) { VIEWS.dough = function () { return doughView(); }; VIEWS.dough.__week = true; }
+    /* Inventory: the kitchen can edit the count lists themselves, no manager needed (Eric, Nov 8). Edit items is open to
+       everyone on this page, and in edit mode each item's name, unit, par and vendor can be changed in place. */
+    (function wrapInv() {
+      if (!VIEWS.inventory || VIEWS.inventory.__open) return;
+      if (!/invEdit|data-inv-edit/.test(String(VIEWS.inventory))) return setTimeout(wrapInv, 200);
+      var inv0 = VIEWS.inventory;
+      VIEWS.inventory = function () { var ie = window.isEditor; window.isEditor = function () { return true; }; try { return inv0.apply(this, arguments); } finally { window.isEditor = ie; } };
+      VIEWS.inventory.__open = true; render();
+    })();
     (function wrapToday() {
       if (!(VIEWS.today && /closeCard/.test(String(VIEWS.today)))) return setTimeout(wrapToday, 150);
       var t0 = VIEWS.today; VIEWS.today = function () { return ui.mode === 'dough' ? doughView() : t0.apply(this, arguments); };
       render();
     })();
-    var r1 = render; render = function () { r1.apply(this, arguments); try { tight(); } catch (err) {} };
+    var r1 = render; render = function () { r1.apply(this, arguments); try { tight(); invFix(); } catch (err) {} };
     render();
   })();
+  var VEND = ['Shamrock', 'Costco', 'Centrico', 'Other'];
+  function invItem(area, id) { var a = (S.invitems && S.invitems.areas && S.invitems.areas[area]) || {}; return (a.items || []).find(function (x) { return x.id === id; }); }
+  function invFix() {
+    if (ui.tab !== 'inventory' || !ui.invEdit) return;
+    document.querySelectorAll('#view [data-inv-del]').forEach(function (b) {
+      var li = b.closest('li'); if (!li || li.querySelector('.x-invfix')) return;
+      var p = b.dataset.invDel.split('|'), it = invItem(p[0], p[1]); if (!it) return;
+      var k = p[0] + '|' + p[1];
+      var row = document.createElement('div'); row.className = 'x-invfix';
+      row.innerHTML = '<input type="text" data-inv-fix="' + k + '|name" value="' + e(it.name || '') + '" aria-label="' + ft('Item', 'Art\u00edculo') + '">' +
+        '<input type="text" data-inv-fix="' + k + '|unit" value="' + e(it.unit || '') + '" placeholder="' + ft('Unit', 'Unidad') + '" aria-label="' + ft('Unit', 'Unidad') + '">' +
+        '<input type="number" inputmode="decimal" data-inv-fix="' + k + '|par" value="' + (it.par == null ? '' : e(it.par)) + '" placeholder="Par" aria-label="Par">' +
+        '<select data-inv-fix="' + k + '|vendor" aria-label="' + ft('Vendor', 'Proveedor') + '">' + VEND.map(function (v) { return '<option' + (it.vendor === v ? ' selected' : '') + '>' + v + '</option>'; }).join('') + '</select>';
+      var span = li.querySelector('span'); (span || li).appendChild(row);
+    });
+  }
+  /* Add item works inside the fold-open cards too (the old handler looked for a plain card and failed). Runs first, on window. */
+  window.addEventListener('click', function (ev) {
+    var b = ev.target.closest && ev.target.closest('[data-inv-add]'); if (!b) return; ev.preventDefault(); ev.stopImmediatePropagation();
+    var card = b.closest('section, details'); if (!card) return;
+    var g = function (f) { var el = card.querySelector('[data-inv-new="' + f + '"]'); return el ? el.value.trim() : ''; }, name = g('name');
+    if (!name) { var nf = card.querySelector('[data-inv-new="name"]'); if (nf) nf.focus(); return; }
+    var area = b.dataset.invAdd, item = { id: 'i' + Date.now().toString(36), name: name, unit: g('unit'), par: g('par') === '' ? null : +g('par'), vendor: g('vendor') || 'Other' };
+    S.invitems = S.invitems || {}; S.invitems.areas = Object.assign({}, S.invitems.areas);
+    var a = Object.assign({ name: area }, S.invitems.areas[area]); a.items = (a.items || []).concat([item]); S.invitems.areas[area] = a;
+    var patch = { areas: {} }; patch.areas[area] = { name: area, items: a.items }; save('invitems/board', patch); render();
+  }, true);
+  document.addEventListener('change', function (ev) {
+    var el = ev.target; if (!el || !el.dataset || !el.dataset.invFix) return; ev.stopImmediatePropagation();
+    var p = el.dataset.invFix.split('|'), area = p[0], id = p[1], f = p[2], a = S.invitems && S.invitems.areas && S.invitems.areas[area]; if (!a) return;
+    var v = f === 'par' ? (el.value === '' ? null : +el.value) : el.value.trim(); if (f === 'name' && !v) { render(); return; }
+    a.items = (a.items || []).map(function (x) { if (x.id !== id) return x; var y = Object.assign({}, x); y[f] = v; return y; });
+    var patch = { areas: {} }; patch.areas[area] = { items: a.items }; save('invitems/board', patch);
+  }, true);
 })();
