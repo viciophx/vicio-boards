@@ -17,12 +17,14 @@
       '<span class="x-itrack"><span class="x-iknob"></span></span><span class="x-istate">' + (on ? ft('ON', 'ON') : ft('OFF', 'OFF')) + '</span></button>';
   }
   function tight() {
-    if (ui.tab !== 'today' || ui.mode === 'service') return;
+    /* The header stays the same on every FOH page and in every mode (Checklists, Host, Expo): title, the switch, the ice
+       machine, the three progress bars and, on Expo, who is on Expo (Eric, Nov 8). */
     var hd = document.getElementById('head'); if (!hd || hd.querySelector('.x-hrow')) return;
     /* One header row, like Eric's mock: [FRONT OF HOUSE / TONIGHT] [Checklists · Host · Expo, ice machine under it]
        [date with Back / Next and Whole night % on top, Opening · Mid shift · Closing under it]. */
     var sw = hd.querySelector('.modesw'), eb = hd.querySelector('.eyebrow'), h1 = hd.querySelector('h1');
-    var bar = document.querySelector('#view > .bar'), sb = document.querySelector('#view .shiftbar');
+    var bar = ui.tab === 'today' ? document.querySelector('#view > .bar') : null, sb = document.querySelector('#view .shiftbar');
+    if (!sb && typeof shiftBar === 'function') { var tmp = document.createElement('div'); tmp.innerHTML = shiftBar(ui.date, (S.shift && S.shift.done) || {}); sb = tmp.firstElementChild; }
     if (!(sw && h1)) return;
     var row = document.createElement('div'); row.className = 'x-hrow';
     var c1 = document.createElement('div'); c1.className = 'x-hc1'; if (eb) c1.appendChild(eb); c1.appendChild(h1);
@@ -36,6 +38,8 @@
     if (stt) { var seg = sw.querySelector('.seg2'); if (seg) seg.title = stt.textContent; stt.remove(); }
     sw.classList.add('x-icein'); sw.insertAdjacentHTML('beforeend', iceSwitchHtml(x, ft, e, ui.lang === 'es'));
     if (iceSec) iceSec.remove();
+    /* Expo: who is on Expo sits in the top row too, right after the ice machine (Eric, Nov 8). */
+    var ew = document.querySelector('#view .x-expowho'); if (ew) { ew.classList.add('x-intop'); c2.appendChild(ew); }
   }
 
 
@@ -53,7 +57,7 @@
     ['After service', ['Heat lamps off and the window wiped down', 'Leftover ramekins tossed, containers to the dish pit', 'Plates, napkins and to-go supplies restocked for tomorrow']]];
   var EXPO_DEF = [['Any pizza', '1 plate per guest, pizza spatula, napkins. Parm and chile flake shakers if the table has none'], ['Seasoned Waffle Fries', 'Ketchup'], ['Garlic Bread', 'Red sauce on the side'],
     ['Green Chile Mozz Sticks', 'Red sauce on the side'], ['Fried Pickles', 'Ranch'], ['Buffalo Baddies', 'Ranch, extra napkins'], ['Wings', 'Ranch, wet naps, empty plate for bones, extra napkins'],
-    ['The Side Chicks', 'Fries and ranch come on it. Extra napkins'], ['Chicken sandwiches (Basic, La Toxica, Bad Chick)', 'Fries and ranch come on it. Steak knife, napkins'], ['Online pickup order', 'Bag, napkins, plates and forks if asked, sauces on the ticket']];
+    ['The Side Chicks', 'Fries and ranch come on it. Extra napkins'], ['Chicken sandwiches', 'Fries and ranch come on it. Steak knife, napkins'], ['Online pickup order', 'Bag, napkins, plates and forks if asked, sauces on the ticket']];
   function names() { try { var x = JSON.parse(localStorage.getItem('vicio_foh_names') || 'null'); if (x && x.date === svcDate() && Array.isArray(x.names)) return x.names; } catch (err) {} var n = typeof whoName === 'function' ? whoName() : ''; return n ? [n] : []; }
   function whoBox() {
     var nm = names(), ppl = (typeof stPeople === 'function' ? stPeople() : []).filter(function (p) { return nm.indexOf(p.name) < 0; });
@@ -64,12 +68,35 @@
       '<input type="text" id="fwho-txt" class="x-other" placeholder="' + ft('Name', 'Nombre') + '" autocomplete="off" hidden><button type="button" class="btn primary x-other" data-fwho="in" hidden>' + ft('Add', 'Agregar') + '</button></div></section>';
   }
   function tablesBox() {
-    var list = (S.layout && S.layout.tables) || [];
-    var by = ['Inside', 'Bar', 'Patio'].map(function (a) { return [a, list.filter(function (t) { return t.area === a; }).sort(function (x, y) { return String(x.n).localeCompare(String(y.n), undefined, { numeric: true }); })]; }).filter(function (g) { return g[1].length; });
-    return '<section class="card x-expotables"><div class="cardhead"><h3>' + ft('Table numbers', 'N\u00fameros de mesa') + '</h3><button type="button" class="btn x" data-tab="seating">' + ft('Floor map', 'Mapa') + '</button></div>' +
-      (by.length ? by.map(function (g) { return '<div class="x-tgrp"><span>' + e(g[0]) + '</span><div>' + g[1].map(function (t) { return '<b>' + e(t.n) + '<small>' + (t.seats || '') + '</small></b>'; }).join('') + '</div></div>'; }).join('')
-        : '<p class="status">' + ft('No tables set up yet.', 'A\u00fan no hay mesas.') + '</p>') + '</section>';
+    /* A small copy of the Reservations floor plan, Inside or Patio, for runners to check where a table is (Eric, Nov 8).
+       Same card as before; bar seats show on the Inside map where they sit at the bar. */
+    var L = S.layout || {}, list = L.tables || [], fx = L.fixtures || [], area = ui.expoArea || 'Inside';
+    var box = function (t) {
+      var sh = t.shape || 'square', seats = +t.seats || 4, w, h;
+      if (sh === 'stool') { w = 5.2; h = 8; } else if (sh === 'tall') { w = 6.6; h = seats > 2 ? 17 : 12; } else if (sh === 'long') { w = 12; h = 11; } else if (sh === 'round') { w = 8; h = 12.3; } else { w = seats > 2 ? 8.4 : 7; h = seats > 2 ? 12.5 : 10.5; }
+      return [w, h];
+    };
+    var items = [];
+    list.forEach(function (t) {
+      var x = t.x, y = t.y;
+      if (area === 'Inside' && t.area === 'Bar') { if (t.ix == null) return; x = t.ix; y = t.iy; }
+      else if (t.area !== area) return;
+      var wh = box(t);
+      items.push('<span class="x-mt ' + e(t.shape || 'square') + '" style="left:' + x + '%;top:' + y + '%;width:' + wh[0] + '%;height:' + wh[1] + '%">' + e(t.n) + '</span>');
+    });
+    fx.filter(function (f) { return f.area === area; }).forEach(function (f) {
+      items.unshift('<span class="x-mf" style="left:' + f.x + '%;top:' + f.y + '%;width:' + f.w + '%;height:' + f.h + '%">' + e(f.label) + '</span>');
+    });
+    var n = list.filter(function (t) { return area === 'Inside' ? (t.area === 'Inside' || (t.area === 'Bar' && t.ix != null)) : t.area === area; }).length;
+    return '<section class="card x-expotables"><div class="cardhead"><h3>' + ft('Floor map', 'Mapa del piso') + '</h3>' +
+      '<span class="x-mtabs">' + ['Inside', 'Patio'].map(function (a) { return '<button type="button" class="chip' + (area === a ? ' on' : '') + '" data-xmap="' + a + '">' + (a === 'Inside' ? ft('Inside', 'Adentro') : ft('Patio', 'Patio')) + '</button>'; }).join('') + '</span>' +
+      '<button type="button" class="btn x" data-tab="seating">' + ft('Full map', 'Mapa completo') + '</button></div>' +
+      (n ? '<div class="x-mini-map">' + items.join('') + '</div>' : '<p class="status">' + ft('No tables set up yet.', 'A\u00fan no hay mesas.') + '</p>') + '</section>';
   }
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest && ev.target.closest('[data-xmap]'); if (!b) return; ev.preventDefault(); ev.stopImmediatePropagation();
+    ui.expoArea = b.dataset.xmap; render();
+  }, true);
   function runsBox() {
     var rows = (S.expo && Array.isArray(S.expo.rows) && S.expo.rows.length) ? S.expo.rows : EXPO_DEF;
     return '<section class="card x-exporuns"><div class="cardhead"><h3>' + ft('What runs with what', 'Qu\u00e9 se lleva con qu\u00e9') + '</h3></div><ul class="x-runs">' +
@@ -79,7 +106,7 @@
     var d = ui.date, done = (S.shift && S.shift.done) || {};
     return dateBar('') + whoBox() +
       '<div class="grid x-expotop"><section class="card svcorders" id="svc-orders"></section>' + tablesBox() + '</div>' +
-      listCard('expo_svc', ft('Expo checklist', 'Lista de Expo'), d, done) + runsBox() + (typeof e86Card === 'function' ? e86Card() : '');
+      runsBox() + listCard('expo_svc', ft('Expo checklist', 'Lista de Expo'), d, done) + (typeof e86Card === 'function' ? e86Card() : '');
   }
   function setupModes() {
     if (typeof MODES === 'undefined' || MODES.__split) return;
@@ -114,7 +141,12 @@
     '.shiftbar.x-mini .segbar{height:7px;border-radius:4px}.shiftbar.x-mini .segbar i{border-radius:4px}.shiftbar.x-mini .segleft{display:none}' +
     '.shiftbar.x-mini .seghead{display:flex;justify-content:space-between;align-items:baseline;gap:4px;flex-wrap:nowrap}.shiftbar.x-mini .seghead b{font-size:12px!important;letter-spacing:.05em;white-space:nowrap}.shiftbar.x-mini .seghead span{font-size:11px!important;white-space:nowrap}' +
     '.x-iceswitch{min-height:42px!important;padding:4px 12px 4px 14px!important;gap:10px!important}.x-itrack{width:46px!important;height:26px!important}.x-iknob{width:20px!important;height:20px!important}.x-iceswitch.on .x-iknob{left:23px!important}' +
+    '.x-expowho.x-intop{margin:0;padding:0;border:0;background:none;box-shadow:none}.x-expowho.x-intop .x-row{gap:6px}.x-expowho.x-intop .x-row{flex-wrap:nowrap}.x-expowho.x-intop select{min-height:42px;flex:0 1 190px;min-width:150px;max-width:220px}.x-expowho.x-intop .x-tag{white-space:nowrap}.x-expowho.x-intop .x-lbl{font-size:13px;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;margin-right:2px}' +
     '.x-expowho{margin-bottom:12px}.x-expowho .x-row{gap:8px}.x-expotop{align-items:start}.x-expotop .svcorders:empty{display:none}' +
+    '.x-mtabs{display:inline-flex;gap:2px;margin-left:auto;padding:3px;border:1px solid var(--line,#2E2E34);border-radius:999px}.x-mtabs .chip{appearance:none;min-height:32px;padding:3px 14px;border:0;border-radius:999px;background:transparent;color:var(--muted);font:700 13px var(--f-body,system-ui);cursor:pointer}.x-mtabs .chip.on{background:var(--cherry,#E0575A);color:#fff}.x-mt.stool{font-size:clamp(9px,1.1vw,12px)}.x-expotables .cardhead{gap:8px;flex-wrap:wrap}' +
+    '.x-mini-map{position:relative;width:100%;aspect-ratio:10/6.5;border:1px solid var(--line,#2E2E34);border-radius:10px;background-image:radial-gradient(var(--line,#2E2E34) 1px,transparent 1px);background-size:14px 14px;overflow:hidden}' +
+    '.x-mt{position:absolute;transform:translate(-50%,-50%);display:grid;place-items:center;border:2px solid var(--good,#4CC38A);border-radius:6px;background:var(--surface,#1B1B1F);color:var(--ink);font:700 clamp(11px,1.6vw,15px)/1 var(--f-display,system-ui)}.x-mt.stool,.x-mt.round{border-radius:50%}' +
+    '.x-mf{position:absolute;transform:translate(-50%,-50%);display:grid;place-items:center;border:1px solid var(--line,#2E2E34);border-radius:6px;background:rgba(255,255,255,.05);color:var(--muted);font:700 11px var(--f-mono,monospace);letter-spacing:.08em;text-transform:uppercase}' +
     '.x-tgrp{display:flex;gap:10px;align-items:flex-start;margin:6px 0}.x-tgrp>span{flex:0 0 56px;font:700 11px var(--f-mono,monospace);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding-top:9px}' +
     '.x-tgrp>div{display:flex;flex-wrap:wrap;gap:6px}.x-tgrp b{display:inline-flex;align-items:baseline;gap:3px;min-width:44px;justify-content:center;padding:6px 10px;border:1px solid var(--line,#2E2E34);border-radius:10px;font:700 19px var(--f-display,system-ui)}.x-tgrp small{font:500 11px var(--f-body,system-ui);color:var(--muted)}' +
     '.x-runs{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px 18px}.x-runs li{display:grid;gap:2px;padding:8px 0;border-bottom:1px solid var(--line,#2E2E34)}.x-runs b{font-size:16px}.x-runs span{color:var(--muted);font-size:14.5px}' +
@@ -177,24 +209,33 @@
     var c2 = document.createElement('div'); c2.className = 'x-hc2'; c2.appendChild(sw); var stt = sw.querySelector('.status'); if (stt) { var seg = sw.querySelector('.seg2'); if (seg) seg.title = stt.textContent; stt.remove(); } sw.classList.add('x-icein'); sw.insertAdjacentHTML('beforeend', iceSwitchHtml((S.ice && typeof S.ice.on === 'boolean') ? S.ice : null, ft, e, es()));
     var c3 = document.createElement('div'); c3.className = 'x-hc3';
     if (bar) { bar.classList.add('x-hbar'); c3.appendChild(bar); }
-    c2.insertAdjacentHTML('beforeend', strip(ui.date).replace('shiftbar x-top', 'shiftbar x-top x-mini'));
+    if (ui.mode !== 'dough') c2.insertAdjacentHTML('beforeend', strip(ui.date).replace('shiftbar x-top', 'shiftbar x-top x-mini'));
     row.appendChild(c1); row.appendChild(c2); row.appendChild(c3); hd.insertBefore(row, hd.firstChild); hd.classList.add('x-tight');
     var ice = document.querySelector('#view .x-ice'); if (ice) ice.remove();
   }
   function doughView() {
-    var d = ui.date, isToday = d === iso(new Date()), jobs = djobs(d), jd = jobs.filter(function (j, i) { return dDone(d, i); }).length;
-    var bar = '<div class="bar"><div class="nav"><button class="btn" data-act="dprev">' + ft('Back', 'Atr\u00e1s') + '</button><div class="date">' + e(fmt(d, { weekday: 'long', month: 'long', day: 'numeric' })) + (isToday ? ' <span class="pill good">' + ft('Today', 'Hoy') + '</span>' : '') + '</div><button class="btn" data-act="dnext">' + ft('Next', 'Siguiente') + '</button>' + (isToday ? '' : '<button class="btn" data-act="dtoday">' + ft('Today', 'Hoy') + '</button>') + '</div></div>';
-    var today = '<section class="card' + (jobs.length && jd < jobs.length ? ' edge' : '') + ' x-dtoday"><div class="cardhead"><h3>' + ft('Dough jobs', 'Trabajos de masa') + '</h3><span class="count">' + (jobs.length ? jd + ft(' of ', ' de ') + jobs.length : '') + '</span></div>' +
-      (jobs.length ? '<ul class="checks plist x-djobs">' + jobs.map(function (j, i) { return '<li><label><input type="checkbox" data-dtoggle="' + d + '|' + i + '"' + (dDone(d, i) ? ' checked' : '') + '><span><b>' + e(j.when) + '</b> \u00b7 ' + e(j.job) + (j.min ? ' (' + e(j.min) + ')' : '') + (j.detail ? '<small>' + e(j.detail) + '</small>' : '') + '</span></label><span class="ptag ' + (j.w === 'C' ? 'c' : 'v') + '">' + (j.w === 'C' ? 'C\u00e9ntrico' : 'Vicio') + '</span></li>'; }).join('') + '</ul>'
-        : '<p class="status">' + ft('No dough job on this day.', 'No hay trabajo de masa este d\u00eda.') + '</p>') +
-      '<p class="status">' + ft('325 g in every pan. Ovens 525\u00b0F top and bottom.', '325 g en cada charola. Hornos a 525\u00b0F arriba y abajo.') + '</p></section>';
-    var ahead = [];
-    for (var k = 1; k <= 6; k++) { var dd = addDays(d, k), js = djobs(dd); if (js.length) ahead.push([dd, js]); }
-    var next = '<section class="card x-dnext"><div class="cardhead"><h3>' + ft('Coming up', 'Lo que viene') + '</h3><button type="button" class="btn x" data-tab="dough">' + ft('Full schedule', 'Calendario completo') + '</button></div>' +
-      (ahead.length ? '<ul class="plain tight">' + ahead.map(function (a) { return '<li><b>' + e(fmt(a[0], { weekday: 'short', month: 'short', day: 'numeric' })) + '</b> <span class="muted">' + a[1].map(function (j) { return e(j.when) + ' ' + e(j.s || j.job); }).join(' \u00b7 ') + '</span></li>'; }).join('') + '</ul>'
-        : '<p class="status">' + ft('Nothing in the next six days.', 'Nada en los pr\u00f3ximos seis d\u00edas.') + '</p>') + '</section>';
-    return bar + today + next;
+    /* Dough is the whole week at a glance (Eric, Nov 8): Sunday to Saturday side by side, every job with its time and who
+       does it, a box to tick it done (same ticks as the Today card), today outlined, and Back / Next by week. */
+    var md = function (x, o) { return parse(x).toLocaleDateString(es() ? 'es-MX' : 'en-US', o); };
+    var td = iso(new Date()), ws = ui.dweek || iso(monday(parse(ui.date))), days = [0, 1, 2, 3, 4, 5, 6].map(function (i) { return addDays(ws, i); });
+    var all = 0, done = 0;
+    var cols = days.map(function (d) {
+      var jobs = djobs(d), dw = parse(d).getDay(), n = jobs.filter(function (j, i) { return dDone(d, i); }).length; all += jobs.length; done += n;
+      return '<div class="x-dday' + (d === td ? ' today' : '') + (jobs.length ? '' : ' empty') + (d < td ? ' past' : '') + '">' +
+        '<div class="x-ddh"><b>' + e(md(d, { weekday: 'short' })) + '</b><span>' + e(md(d, { month: 'short', day: 'numeric' })) + '</span>' + (jobs.length ? '<i class="' + (n === jobs.length ? 'ok' : '') + '">' + n + '/' + jobs.length + '</i>' : '') + '</div>' +
+        '<p class="x-dds">' + e((typeof DSTAFF !== 'undefined' && DSTAFF[dw]) || ft('No dough tasks', 'Sin tareas de masa')) + '</p>' +
+        (jobs.length ? jobs.map(function (j, i) { var ok = dDone(d, i); return '<label class="x-dj' + (j.w === 'C' ? ' c' : '') + (ok ? ' ok' : '') + '"><input type="checkbox" data-dtoggle="' + d + '|' + i + '"' + (ok ? ' checked' : '') + '><span><em>' + e(j.when) + '</em><b>' + e(j.job) + '</b>' + (j.min ? '<small>' + e(j.min) + '</small>' : '') + '</span></label>'; }).join('')
+          : '<p class="x-dnone">' + ft('Nothing', 'Nada') + '</p>') + '</div>';
+    }).join('');
+    var thisWeek = ws === iso(monday(new Date()));
+    var bar = '<div class="bar"><div class="nav"><button class="btn" data-xdw="-7">' + ft('Last week', 'Semana pasada') + '</button><div class="date">' + ft('Week of ', 'Semana del ') + e(md(ws, { month: 'short', day: 'numeric' })) + ' \u2013 ' + e(md(days[6], { month: 'short', day: 'numeric' })) + (thisWeek ? ' <span class="pill good">' + ft('This week', 'Esta semana') + '</span>' : '') + '</div><button class="btn" data-xdw="7">' + ft('Next week', 'Siguiente') + '</button>' + (thisWeek ? '' : '<button class="btn" data-xdw="0">' + ft('This week', 'Esta semana') + '</button>') + '</div><span class="count">' + done + ft(' of ', ' de ') + all + ft(' done', ' hechos') + '</span></div>';
+    return bar + '<div class="x-dweek">' + cols + '</div>' + (typeof LEGEND !== 'undefined' ? LEGEND : '') +
+      '<p class="status">' + ft('325 g in every pan. Ovens 525\u00b0F top and bottom, on 30 minutes before the bake.', '325 g en cada charola. Hornos a 525\u00b0F arriba y abajo, prendidos 30 minutos antes de hornear.') + '</p>';
   }
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest && ev.target.closest('[data-xdw]'); if (!b) return; ev.preventDefault(); ev.stopImmediatePropagation();
+    var n = +b.dataset.xdw; ui.dweek = n === 0 ? null : addDays(ui.dweek || iso(monday(parse(ui.date))), n); render();
+  }, true);
   var CSS = '#head .lede,#head .eyebrow{display:none}#head h1{margin-bottom:10px}' +
     '.x-hrow{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px 28px;align-items:start;margin:0 0 14px}.x-hc1 .eyebrow{display:block!important;margin:2px 0}.x-hc1 h1{margin:0;line-height:.95}' +
     '.x-hc2{display:grid;gap:8px;justify-items:start}.x-hc2 .modesw{margin:0}.x-hc3{display:grid;gap:8px;min-width:0}.x-hc3 .x-hbar{margin:0}' +
@@ -214,7 +255,12 @@
     '.shiftbar.x-mini .seghead{display:flex;justify-content:space-between;align-items:baseline;gap:4px;flex-wrap:nowrap}.shiftbar.x-mini .seghead b{font-size:12px!important;letter-spacing:.05em;white-space:nowrap}.shiftbar.x-mini .seghead span{font-size:11px!important;white-space:nowrap}' +
     '.x-iceswitch{min-height:42px!important;padding:4px 12px 4px 14px!important;gap:10px!important}.x-itrack{width:46px!important;height:26px!important}.x-iknob{width:20px!important;height:20px!important}.x-iceswitch.on .x-iknob{left:23px!important}' +
     '#head .x-hc2{padding-right:72px}' +
-    '.x-djobs li label span{font-size:17px}.x-djobs small{display:block;color:var(--muted);font-size:14px}';
+    '.x-dweek{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin:0 0 12px}@media (max-width:900px){.x-dweek{grid-template-columns:repeat(2,minmax(0,1fr))}}' +
+    '.x-dday{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 8px;display:flex;flex-direction:column;gap:6px;min-width:0}.x-dday.today{border:2px solid var(--cherry);box-shadow:0 0 0 3px rgba(139,30,30,.08)}.x-dday.past{opacity:.72}.x-dday.empty{background:transparent}' +
+    '.x-ddh{display:flex;align-items:baseline;gap:6px}.x-ddh b{font:700 16px var(--f-display,system-ui);text-transform:uppercase;letter-spacing:.03em}.x-ddh span{color:var(--muted);font-size:13px}.x-ddh i{margin-left:auto;font:600 11px var(--f-mono,monospace);font-style:normal;color:var(--muted)}.x-ddh i.ok{color:var(--good)}' +
+    '.x-dds{margin:0;font-size:11.5px;line-height:1.3;color:var(--muted)}.x-dnone{margin:6px 0 0;color:var(--muted);font-size:13px}' +
+    '.x-dj{display:flex;gap:6px;align-items:flex-start;border-left:4px solid var(--cherry);background:var(--bg);border-radius:0 8px 8px 0;padding:6px 6px;cursor:pointer}.x-dj.c{border-left-color:var(--good)}.x-dj input{width:20px;height:20px;margin:1px 0 0;flex:0 0 auto;accent-color:var(--good)}' +
+    '.x-dj span{display:grid;gap:1px;min-width:0;font-size:13px;line-height:1.3}.x-dj em{font:600 11px var(--f-mono,monospace);font-style:normal;color:var(--muted)}.x-dj b{font-weight:600;overflow-wrap:anywhere}.x-dj small{color:var(--muted);font-size:11.5px}.x-dj.ok b{text-decoration:line-through;color:var(--muted)}';
   (function hook() {
     if (typeof render !== 'function' || typeof ui === 'undefined' || typeof S === 'undefined' || typeof MODES === 'undefined' || !document.head) return setTimeout(hook, 150);
     var st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
