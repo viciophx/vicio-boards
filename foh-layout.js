@@ -201,6 +201,8 @@
       '<span class="x-itrack"><span class="x-iknob"></span></span><span class="x-istate">' + (on ? ft('ON', 'ON') : ft('OFF', 'OFF')) + '</span></button>';
   }
   function tight() {
+    /* BOH Service: no ice machine there at all (Eric, Nov 9). */
+    if (ui.tab === 'today' && ui.mode === 'service') { var ic = document.querySelector('#view .x-ice'); if (ic) ic.remove(); }
     if (ui.tab !== 'today' || ui.mode === 'service') return;
     var hd = document.getElementById('head'); if (!hd || hd.querySelector('.x-hrow')) return;
     var sw = hd.querySelector('.modesw'), eb = hd.querySelector('.eyebrow'), h1 = hd.querySelector('h1'), bar = document.querySelector('#view > .bar');
@@ -278,7 +280,8 @@
       if (!VIEWS.inventory || VIEWS.inventory.__open) return;
       if (!/invEdit|data-inv-edit/.test(String(VIEWS.inventory))) return setTimeout(wrapInv, 200);
       var inv0 = VIEWS.inventory;
-      VIEWS.inventory = function () { var ie = window.isEditor; window.isEditor = function () { return true; }; try { return inv0.apply(this, arguments); } finally { window.isEditor = ie; } };
+      /* The page keeps the board's own prep on-hand count (Make / Fill) on top, then the Saturday counts. */
+      VIEWS.inventory = function () { var ie = window.isEditor; window.isEditor = function () { return true; }; try { return (typeof prepCount === 'function' ? prepCount() : '') + inv0.apply(this, arguments); } finally { window.isEditor = ie; } };
       VIEWS.inventory.__open = true; render();
     })();
     (function wrapToday() {
@@ -292,7 +295,23 @@
   var VEND = ['Shamrock', 'Costco', 'Centrico', 'Other'];
   function invItem(area, id) { var a = (S.invitems && S.invitems.areas && S.invitems.areas[area]) || {}; return (a.items || []).find(function (x) { return x.id === id; }); }
   function invFix() {
-    if (ui.tab !== 'inventory' || !ui.invEdit) return;
+    if (ui.tab !== 'inventory') return;
+    document.querySelectorAll('#view p.status').forEach(function (p) { if (/A manager adds them/.test(p.textContent)) p.textContent = ft('No items yet. Tap Edit items to add them.', 'A\u00fan no hay art\u00edculos. Toca Editar art\u00edculos para agregarlos.'); });
+    /* The kitchen counts whole cases, bags or portions, never tenths (Eric, Nov 9). Tenths are a bar thing. */
+    document.querySelectorAll('#view .standard p, #view p.status, #view p').forEach(function (p) {
+      var t = p.textContent;
+      if (/Partials in tenths/.test(t)) p.textContent = 'Count everything in whole cases, bags or portions, type the number next to each item, then tap Count done on each area. Colette builds the Sunday order from these.';
+      else if (/Parciales en d\u00e9cimas/.test(t)) p.textContent = 'Cuenta todo en cajas, bolsas o porciones completas, escribe el n\u00famero junto a cada art\u00edculo y toca Conteo listo en cada \u00e1rea. Colette arma el pedido del domingo con esto.';
+      else if (/Count in tenths of a pan/.test(t)) p.textContent = t.replace(/Count in tenths of a pan \(0\.5 is half a pan\)\./, 'Count whole cases, bags or portions.');
+    });
+    document.querySelectorAll('#view input[type=number]').forEach(function (i) { if (i.step !== '1') { i.step = '1'; i.setAttribute('inputmode', 'numeric'); } });
+    /* No beer cooler count on BOH (Eric, Nov 9): that card is dropped and the counted total covers the other areas. */
+    var cards = Array.prototype.slice.call(document.querySelectorAll('#view .grid > section.card, #view .grid > details.card')).filter(function (c) { return c.querySelector('[data-inv-done],[data-inv-add],input[data-inv]') || /Counted|Contado|No items yet|A\u00fan no hay/.test(c.textContent); });
+    cards.forEach(function (c) { var h = c.querySelector('h3'); if (h && /^Beer cooler/i.test(h.textContent.trim())) c.remove(); });
+    var left = Array.prototype.slice.call(document.querySelectorAll('#view .grid > section.card, #view .grid > details.card')).filter(function (c) { return cards.indexOf(c) >= 0 && c.isConnected; });
+    var cnt = document.querySelector('#view > .bar .count');
+    if (cnt && left.length) { var dn = left.filter(function (c) { var p = c.querySelector('.pill.good'); return p && /Counted|Contado/.test(p.textContent); }).length; cnt.textContent = dn + ft(' of ', ' de ') + left.length + ft(' counted', ' contados'); }
+    if (!ui.invEdit) return;
     document.querySelectorAll('#view [data-inv-del]').forEach(function (b) {
       var li = b.closest('li'); if (!li || li.querySelector('.x-invfix')) return;
       var p = b.dataset.invDel.split('|'), it = invItem(p[0], p[1]); if (!it) return;
