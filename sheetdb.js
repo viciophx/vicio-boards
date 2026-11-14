@@ -18,6 +18,9 @@
   /* Dough week (dough.js, Nov 13 2026): one Thursday batch whose steps follow the day the dough was made. Kitchen board only;
      it waits for the board on its own. */
   try { if (window.VICIO_BOARD === 'kitchen') { var dg = document.createElement('script'); dg.src = 'dough.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(dg); } } catch (e) {}
+  /* AM shift checklists (amshift.js, Nov 14 2026): on a day with a Vicio shift before 3 PM, AM open, AM hand off and PM takeover
+     lists. FOH board only; it waits for the board on its own. */
+  try { if (window.VICIO_BOARD === 'foh') { var am = document.createElement('script'); am.src = 'amshift.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(am); } } catch (e) {}
   if (PREVIEW) document.addEventListener('DOMContentLoaded', function () { var b = document.createElement('div'); b.textContent = 'PREVIEW \u00b7 not live yet'; b.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:6px;z-index:2147483647;background:#F0A43A;color:#111;font:700 12px system-ui;letter-spacing:.08em;padding:4px 12px;border-radius:999px;pointer-events:none'; document.body.appendChild(b); });
   /* Online pickup orders (orders-addon.js): the same screen Colette's Board runs, so the iPads hear and work orders too.
      It waits for the store, so it is fine to load before the PIN. ord and osettings are shared across the boards. */
