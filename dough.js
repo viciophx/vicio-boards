@@ -3,7 +3,7 @@
    batch, and the board tracks that batch from its start time:
      Start     mix the dough, into the fridge
      Next day  portion into pans, leave out 1 to 2 hours, first stretch, cover, back in the fridge
-     Day after 10 AM pull and let rise, 1 PM stretch again if it needs it, 3:30 PM ovens on, 4 PM bake
+     Day after 1 PM stretch again if it needs it, 3:30 PM ovens on, 4 PM bake (no pan pull, Nov 16 2026)
    A step that is missed carries to the next day. The dough holds 72 hours from its start and wants at least 18 hours in
    the pan; each batch shows its 72 hour deadline, and a bake that came sooner than 18 hours is noted. Any number of
    batches can be going at once. The goal is still a batch on Thursday, shown as a reminder only.
@@ -17,13 +17,15 @@
   if (window.__vicioDough) return;
   window.__vicioDough = true;
   if (window.VICIO_BOARD !== 'kitchen') return;
+  /* The kitchen's Friday and Saturday afternoon reset lives in amshift.js; the store client loads that file on FOH only, so load it here too. */
+  try { var am = document.createElement('script'); am.src = 'amshift.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(am); } catch (e) {}
   var SWITCH = '2026-11-14', HOLD_H = 72, PAN_MIN_H = 18;
-  var STEP = ['portion', 'stretch1', 'pull', 'stretch', 'bake'];
+  /* No pan pull step (Eric, Nov 16 2026): bake day is the second stretch, ovens and the bake. */
+  var STEP = ['portion', 'stretch1', 'stretch', 'bake'];
   var JOB = {
     mix: { w: 'V', when: 'Made', job: 'Mix the dough (20 qt), into the fridge', min: '', s: 'Mix', st: 'mix', r: 11.9 },
     portion: { w: 'V', when: 'Pan day', job: 'Portion into pans, then leave them out 1 to 2 hours', min: '30 min', s: 'Portion', st: 'portion', r: 12.1 },
     stretch1: { w: 'V', when: '1 to 2 hours later', job: 'First stretch, then cover and back in the fridge', min: '20 min', s: 'First stretch', st: 'stretch1', r: 12.2 },
-    pull: { w: 'C', when: '10 AM', job: 'Pull the pans from the fridge and let them rise', min: '10 min', s: 'Pull', st: 'pull' },
     stretch: { w: 'V', when: '1 PM', job: 'Stretch again if it needs it', min: '', s: 'Stretch', st: 'stretch' },
     bake: { w: 'V', when: '4 PM', job: 'Bake the pans', min: '1 hr', s: 'Bake', st: 'bake' }
   };
@@ -69,7 +71,7 @@
     var goal = addDays(portion, 1) > limit ? limit : addDays(portion, 1);
     var p = { b: b, got: g, start: start, portion: portion, limit: limit, limitAt: limitAt, open: open, over: open && Date.now() > limitAt };
     p.stretch1 = g.stretch1 || portion;                       /* the first stretch belongs to pan day; it does not carry to bake day */
-    ['pull', 'stretch', 'bake'].forEach(function (s) { p[s] = ride(goal, g[s]); });
+    ['stretch', 'bake'].forEach(function (s) { p[s] = ride(goal, g[s]); });
     return (cache['p' + b.id] = p);
   }
   function note(p, s, k) {
@@ -270,7 +272,7 @@
       var q = el.dataset.dtoggle.split('|'), key = dKey(q[0], q[1]);
       if (typeof key !== 'string') return;
       if (/^mix_/.test(key)) { e.stopImmediatePropagation(); el.checked = true; return; }
-      if (/^(portion|stretch1|pull|stretch|bake)_b/.test(key)) {
+      if (/^(portion|stretch1|stretch|bake)_b/.test(key)) {
         var at = {}; at[key] = el.checked ? Date.now() : null;
         var cur = S.caldough[q[0]] || {}; S.caldough[q[0]] = Object.assign({}, cur, { at: Object.assign({}, cur.at, at) });
         save('caldough/' + q[0], { at: at });
