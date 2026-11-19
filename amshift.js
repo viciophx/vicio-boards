@@ -91,9 +91,21 @@
         'Both restrooms: quick look',
         'Water pitchers full: 2 at Bar, 1 at Host Stand']]]
     };
-    var EVENING = /^(Turn on candle|Plug in tower light|Plug in marble lamp|Table settings complete \(tall lights\))$/;
+    var EVE_IDS = ['host_open_0_0', 'host_open_0_1', 'host_open_0_6', 'host_open_0_8'];   /* candle, tower light, marble lamps, tall lights: evening, so not on the AM open */
+    var SPEAKER = 'Turn on the speaker and make sure it is plugged in, on top of the tower lamp';
+    var TEXT = { host_open_0_6: 'Turn on both marble lamps next to the host stand, by the entrance' };
+    var DROP = ['host_open_0_4', 'host_open_3_2'];
+    var NOTE = 'Phones away. No sitting or eating on the floor or at the bar.';
+    var HOST_SECS = [
+      ['Host stand', ['host_open_0_0', 'host_open_0_6', 'host_open_2_1', 'host_open_0_11', 'host_open_2_3', 'host_open_2_4', 'host_open_1_3']],
+      ['Main restaurant', ['host_open_0_1', 'host_open_9_0', 'host_open_0_5', 'host_open_0_8', 'host_open_0_3', 'host_open_0_7', 'host_open_0_9', 'host_open_1_0', 'host_open_2_0', 'host_open_2_2', 'host_open_3_1', 'host_open_1_2', 'host_open_3_0', 'host_open_0_10', 'host_open_1_1']],
+      ['Outside', ['host_open_0_12', 'host_open_0_13', 'host_open_0_2']]];
     var SP = {
       'Lunch check, around 2 PM': 'Revisi\u00f3n del almuerzo, como a las 2 PM', 'AM hand off, 3 to 4 PM': 'Entrega del turno AM, 3 a 4 PM', 'PM takeover, 4 PM': 'Relevo del turno PM, 4 PM',
+      'Host stand': 'Puesto de anfitri\u00f3n', 'Main restaurant': 'Restaurante', 'Outside': 'Afuera',
+      'Turn on both marble lamps next to the host stand, by the entrance': 'Prende las dos l\u00e1mparas de m\u00e1rmol junto al puesto de anfitri\u00f3n, en la entrada',
+      'Turn on the speaker and make sure it is plugged in, on top of the tower lamp': 'Prende la bocina y revisa que est\u00e9 conectada, encima de la l\u00e1mpara de torre',
+      'Phones away. No sitting or eating on the floor or at the bar.': 'Nada de tel\u00e9fonos. No sentarse ni comer en el piso ni en la barra.',
       'Expo window': 'Ventana de expo', 'Expo window during service': 'Ventana de expo durante el servicio', 'Expo window at close': 'Ventana de expo al cerrar',
       'Garnishes checked and refilled': 'Guarniciones revisadas y rellenadas', 'Ice wells topped off': 'Pozos de hielo rellenados', 'Glassware washed and racked; nothing piling up': 'Vasos lavados y en rejillas; que nada se acumule',
       'Trash checked; take it out if it is over half full': 'Basura revisada; s\u00e1cala si est\u00e1 a m\u00e1s de la mitad', 'Both restrooms: quick look': 'Los dos ba\u00f1os: un vistazo',
@@ -123,14 +135,27 @@
       Object.keys(NEW).forEach(function (k) { if (!LISTS[k]) LISTS[k] = NEW[k]; });
       if (typeof ES === 'object' && ES) Object.keys(SP).forEach(function (k) { if (ES[k] == null) ES[k] = SP[k]; });
       var s0 = sections;
+      /* Host / Busser open, laid out by area (Eric, Nov 19 2026): Host stand first, then Main restaurant (trash last), then
+         Outside. Items keep their ids, so ticks saved before stay with them. The A-frame is gone; "phones away" is a note under
+         the list, not a box. Anything else on the list that night (a special event, Expo on two-shift days) follows as it was. */
+      function hostLayout(secs) {
+        var by = {}; secs.forEach(function (s) { s[1].forEach(function (i) { by[i[0]] = i; }); });
+        var used = {};
+        var pick = function (ids) { return ids.map(function (id) { if (id === 'host_open_9_0') { used[id] = 1; return [id, word(SPEAKER)]; } var i = by[id]; if (!i) return null; used[id] = 1; return TEXT[id] ? [id, word(TEXT[id])].concat(i.slice(2)) : i; }).filter(Boolean); };
+        var out = HOST_SECS.map(function (s) { return [word(s[0]), pick(s[1])]; }).filter(function (s) { return s[1].length; });
+        DROP.forEach(function (id) { used[id] = 1; });
+        secs.forEach(function (s) { var rest = s[1].filter(function (i) { return !used[i[0]]; }); if (rest.length) out.push([s[0], rest].concat(s.slice(2))); });
+        return out;
+      }
       var expoSecs = function (d) { return s0('expo_svc', d); };
       sections = function (key, d) {
         if (NEW[key] && !amDay(d)) return [];
         var two = amDay(d);
         if (key === 'expo_svc' && two) return [];
         var out = s0(key, d);
+        if (key === 'host_open') out = hostLayout(out);
         if (!two) return out;
-        if (key === 'host_open') out = out.map(function (s) { return [s[0], s[1].filter(function (i) { return !EVENING.test(i[1]); })].concat(s.slice(2)); }).filter(function (s) { return s[1].length; });
+        if (key === 'host_open') out = out.map(function (s) { return [s[0], s[1].filter(function (i) { return EVE_IDS.indexOf(i[0]) < 0; })].concat(s.slice(2)); }).filter(function (s) { return s[1].length; });
         /* Expo on a two-shift day: the window set-up goes on the AM busser's open, service on the PM evening check, the rest on the close. */
         var ex = expoSecs(d);
         if (key === 'host_open' && ex[0]) out = out.concat([['Expo window', ex[0][1]]]);
@@ -177,7 +202,58 @@
           if (ppl.every(function (n) { return pm.indexOf(n) >= 0 && am.indexOf(n) < 0; })) return block(tt('The AM crew signs the hand off. Your part is the PM takeover.', 'El equipo AM firma la entrega. Lo tuyo es el relevo del PM.'));
         }
       }, true);
-      window.VicioAM = { amDay: amDay, crew: crew };
+      /* Host / Busser open: each area in its own outlined box, the area being worked on in red under the title, and a check-all
+         mark on the list and on each area. Check-all asks first ("Are you sure? Eric is going to check."); a second tap within 5
+         seconds ticks everything still open there under the signed-in name, and records that it was done all at once. */
+      var armed = null;
+      function hostCards() { return document.querySelectorAll('#view details[data-fold^="host_open_"]'); }
+      function word(x) { return es() && SP[x] ? SP[x] : x; }
+      function decorate() {
+        var d = ui.date || iso(new Date()), done = (S.shift && S.shift.done) || {}, secs = sections('host_open', d);
+        hostCards().forEach(function (card) {
+          if (card.querySelector('.x-hsec')) return;
+          var body = card, kids = Array.prototype.slice.call(card.children), si = -1, box = null;
+          kids.forEach(function (el) {
+            if (el.tagName === 'P' && el.classList.contains('grp')) {
+              si++; box = document.createElement('div'); var s = secs[si] || ['', []], left = s[1].filter(function (i) { return !done[i[0]]; }).length;
+              box.className = 'x-hsec' + (left ? '' : ' ok'); box.dataset.sec = si; el.parentNode.insertBefore(box, el); box.appendChild(el);
+              if (left) el.insertAdjacentHTML('beforeend', '<button type="button" class="x-all" data-hall="sec:' + si + '" aria-label="' + hx(tt('Check all in ', 'Marcar todo en ') + s[0]) + '">' + allLbl('sec:' + si) + '</button>');
+            } else if (box && el.tagName === 'UL') box.appendChild(el);
+          });
+          var cur = secs.filter(function (s) { return s[1].some(function (i) { return !done[i[0]]; }); })[0];
+          var h3 = card.querySelector('summary h3');
+          if (h3 && !card.querySelector('.x-hcur')) {
+            h3.insertAdjacentHTML('beforeend', '<span class="x-hcur">' + hx(cur ? cur[0] : tt('All done', 'Todo listo')) + '</span>');
+            if (cur) { var head = card.querySelector('summary .cardhead'); if (head) head.insertAdjacentHTML('beforeend', '<button type="button" class="x-all" data-hall="all" aria-label="' + tt('Check all', 'Marcar todo') + '">' + allLbl('all') + '</button>'); }
+          }
+          if (!card.querySelector('.x-hnote')) card.insertAdjacentHTML('beforeend', '<p class="x-hnote">' + hx(word(NOTE)) + '</p>');
+        });
+      }
+      function allLbl(scope) { return armed && armed.scope === scope ? hx(tt('Are you sure? Eric is going to check.', '\u00bfSeguro? Eric lo va a revisar.')) : '\u2713 ' + tt('All', 'Todo'); }
+      document.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('[data-hall]'); if (!b) return;
+        e.preventDefault(); e.stopPropagation();
+        var scope = b.dataset.hall, d = ui.date || iso(new Date());
+        if (!armed || armed.scope !== scope) { armed = { scope: scope, at: Date.now() }; b.innerHTML = allLbl(scope); b.classList.add('armed'); setTimeout(function () { if (armed && armed.scope === scope && Date.now() - armed.at >= 4900) { armed = null; render(); } }, 5000); return; }
+        armed = null;
+        var me = whoName(); if (!me) { flash(tt('Sign in with your name first.', 'Primero pon tu nombre.')); render(); return; }
+        var secs = sections('host_open', d), done = (S.shift && S.shift.done) || {};
+        var its = scope === 'all' ? secs.flatMap(function (s) { return s[1]; }) : ((secs[+scope.slice(4)] || [])[1] || []);
+        var ids = its.map(function (i) { return i[0]; }).filter(function (id) { return !done[id]; }); if (!ids.length) { render(); return; }
+        var patch = { done: {}, by: {}, bulk: {} }; ids.forEach(function (id) { patch.done[id] = true; patch.by[id] = me; });
+        patch.bulk['host_open:' + (scope === 'all' ? 'all' : (secs[+scope.slice(4)] || [''])[0])] = { at: Date.now(), by: me, n: ids.length };
+        S.shift = Object.assign({}, S.shift, { done: Object.assign({}, S.shift.done, patch.done), by: Object.assign({}, S.shift.by, patch.by), bulk: Object.assign({}, S.shift.bulk, patch.bulk) });
+        save('shifts/' + d, patch);
+        try { markListDone('shifts/' + d, ids[ids.length - 1], true); } catch (err) {}
+        render();
+      }, true);
+      style('.x-hsec{border:2px solid var(--cherry,#8B1E1E);border-radius:12px;padding:6px 12px 10px;margin:10px 0}.x-hsec.ok{border-color:var(--line,#ccc);opacity:.85}.x-hsec .grp{margin-top:4px;display:flex;align-items:center;gap:10px}' +
+        '.x-hcur{display:block;color:var(--cherry,#8B1E1E);font:700 15px/1.3 system-ui,-apple-system,sans-serif;margin-top:3px;text-transform:none;letter-spacing:0}' +
+        '.x-all{margin-left:auto;min-height:36px;padding:4px 12px;border-radius:999px;border:1.5px solid var(--cherry,#8B1E1E);background:transparent;color:var(--cherry,#8B1E1E);font:700 13px system-ui,-apple-system,sans-serif;cursor:pointer;white-space:nowrap}' +
+        '.x-all.armed,.x-all:active{background:var(--cherry,#8B1E1E);color:#fff}summary .cardhead{flex-wrap:wrap}.x-hnote{margin:6px 2px 2px;color:var(--muted,#666);font-size:14px;font-style:italic}');
+      var r0 = render;
+      render = function () { r0.apply(this, arguments); try { decorate(); } catch (err) {} };
+      window.VicioAM = { amDay: amDay, crew: crew, hostLayout: hostLayout };
       render();
       /* The order flips at 4 PM; redraw once a minute when nobody is typing. */
       setInterval(function () { var a = document.activeElement; if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return; if (amDay(iso(new Date()))) { try { render(); } catch (e) {} } }, 60000);
