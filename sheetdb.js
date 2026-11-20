@@ -12,6 +12,29 @@
   /* Preview: the same page with ?preview in the link loads extras-preview.js (changes Eric is still reviewing) instead of
      extras.js, shows a PREVIEW badge, and follows version-preview.txt. Without ?preview nothing here changes. */
   var PREVIEW = /[?&]preview\b/.test(location.search);
+  /* Training mode (Eric, Nov 19 2026): the same page with ?training in the link runs on sample people and an empty practice
+     night. Nothing reaches the shared sheet; ticks stay on this device until Reset. Everything this device remembers (names,
+     folds, language) is kept apart from the real board under its own keys. */
+  var TRAINING = /[?&]training\b/.test(location.search);
+  if (TRAINING) {
+    try {
+      var TP = 'vtrain:', ls = window.localStorage, g0 = Storage.prototype.getItem, s0 = Storage.prototype.setItem, r0 = Storage.prototype.removeItem;
+      Storage.prototype.getItem = function (k) { return this === ls ? g0.call(this, TP + k) : g0.call(this, k); };
+      Storage.prototype.setItem = function (k, v) { return this === ls ? s0.call(this, TP + k, v) : s0.call(this, k, v); };
+      Storage.prototype.removeItem = function (k) { return this === ls ? r0.call(this, TP + k) : r0.call(this, k); };
+    } catch (e) {}
+    document.addEventListener('DOMContentLoaded', function () {
+      var b = document.createElement('div');
+      b.innerHTML = '<b>TRAINING</b> \u00b7 practice only, nothing is saved to the real board <button type="button" id="vt-reset">Reset</button> <a href="' + location.pathname + '">Exit</a>';
+      b.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);top:calc(6px + env(safe-area-inset-top,0px));z-index:2147483647;background:#1F6FEB;color:#fff;font:600 13px system-ui,-apple-system,sans-serif;padding:6px 8px 6px 14px;border-radius:999px;display:flex;gap:10px;align-items:center;box-shadow:0 4px 16px rgba(0,0,0,.3)';
+      document.body.appendChild(b);
+      var st = document.createElement('style'); st.textContent = '#vt-reset,.vt-x{font:600 13px system-ui;border:0;border-radius:999px;padding:4px 10px;background:#fff;color:#1F6FEB;cursor:pointer}' + 'div[style*="1F6FEB"] a{color:#fff;font-weight:700;padding:4px 6px}'; document.head.appendChild(st);
+      document.getElementById('vt-reset').onclick = function () {
+        try { for (var i = window.localStorage.length - 1; i >= 0; i--) { var k = Storage.prototype.key.call(window.localStorage, i); if (k && k.indexOf('vtrain:') === 0) r0.call(window.localStorage, k); } } catch (e) {}
+        location.reload();
+      };
+    });
+  }
   try { var xs = document.createElement('script'); xs.src = (PREVIEW ? 'extras-preview.js' : 'extras.js') + '?v=' + Date.now(); (document.head || document.documentElement).appendChild(xs); } catch (e) {}
   /* FOH layout (foh-layout.js, Nov 8 2026): the one-row Today header and Checklists \u00b7 Host \u00b7 Expo. It waits for extras.js on its own. */
   try { var fl = document.createElement('script'); fl.src = 'foh-layout.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(fl); } catch (e) {}
@@ -43,6 +66,7 @@
     setInterval(function () { if (!document.hidden) check(); }, 300000);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
   })();
+  if (TRAINING) { trainingStore(); return; }
   var API = window.VICIO_API || '';
   if (!API) return;
   var SHARED = ['events', 'sshifts', 'sstaff', 'schedule', 'caltasks', 'resv', 'e86', 'tr', 'ord', 'osettings'];
@@ -216,4 +240,70 @@
     notify: function (subject, html) { return postJson({ op: 'notify', subject: subject, html: html }); },
     forgetPin: function () { setPin(''); }
   };
+
+  /* ---------- Training store: sample people, practice ticks kept on this device only ---------- */
+  function trainingStore() {
+    var KEY = 'store', cache = {};
+    try { cache = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { cache = {}; }
+    var prefix = window.VICIO_BOARD === 'foh' ? 'foh_' : 'kit_';
+    var SHAREDT = ['events', 'sshifts', 'sstaff', 'schedule', 'caltasks', 'resv', 'e86', 'tr', 'ord', 'osettings'];
+    function mp(p) { p = String(p); if (p.charAt(0) === '~') return p.slice(1); return SHAREDT.indexOf(p.split('/')[0]) >= 0 ? p : prefix + p; }
+    var ROSTER = [['alex', 'Alex Rivera', 'Lead Bartender', 'Bar'], ['jordan', 'Jordan Lee', 'Bartender', 'Bar'], ['sam', 'Sam Lopez', 'Busser', 'Floor'], ['casey', 'Casey Kim', 'Host', 'Floor'],
+      ['dana', 'Dana Cruz', 'Line Cook', 'Kitchen'], ['pat', 'Pat Morgan', 'Manager on Duty', 'Manager']];
+    ROSTER.forEach(function (r) { if (!cache['sstaff/' + r[0]]) cache['sstaff/' + r[0]] = { name: r[1], role: r[2], dept: r[3], sample: true }; });
+    function iso(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+    function shiftsCsv() {
+      var rows = [['Date', 'Name', 'Role', 'Location', 'Start', 'End', 'Source', 'Shift ID']], base = new Date();
+      for (var i = -7; i <= 7; i++) {
+        var d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i), k = iso(d), two = d.getDay() === 5 || d.getDay() === 6;
+        var add = function (n, r, a, b) { rows.push([k, n, 'Vicio ' + r, 'Vicio', a, b, 'Sample', 'train-' + k + '-' + n.split(' ')[0].toLowerCase() + '-' + a.replace(/\W/g, '')]); };
+        if (two) { add('Jordan Lee', 'Bartender', '11:00 AM', '4:00 PM'); add('Casey Kim', 'Host', '11:00 AM', '4:00 PM'); add('Dana Cruz', 'Line Cook', '11:00 AM', '4:00 PM'); }
+        add('Alex Rivera', 'Lead Bartender', '4:00 PM', '12:00 AM'); add('Sam Lopez', 'Busser', two ? '4:00 PM' : '5:00 PM', '12:00 AM');
+        add('Dana Cruz', 'Line Cook', two ? '5:00 PM' : '4:00 PM', two ? '1:00 AM' : '12:00 AM'); add('Pat Morgan', 'Manager-on-Duty', '5:00 PM', '12:00 AM');
+      }
+      return rows.map(function (r) { return r.join(','); }).join('\n');
+    }
+    var docSubs = [], colSubs = [];
+    function persist() { try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch (e) {} }
+    function clone(o) { return o == null ? o : JSON.parse(JSON.stringify(o)); }
+    function deep(a, b) { Object.keys(b || {}).forEach(function (k) { var v = b[k]; if (v && typeof v === 'object' && !Array.isArray(v)) a[k] = deep(a[k] && typeof a[k] === 'object' && !Array.isArray(a[k]) ? a[k] : {}, v); else a[k] = v; }); return a; }
+    function snap(path) { var d = cache[path]; return { exists: d !== undefined, id: path.split('/').pop(), data: function () { return clone(d) || {}; } }; }
+    function fire(path) {
+      docSubs.forEach(function (s) { if (!path || s.path === path) s.fire(); });
+      colSubs.forEach(function (s) { if (!path || path.indexOf(s.col + '/') === 0) s.fire(); });
+    }
+    function write(op, path, data) {
+      if (op === 'delete') delete cache[path]; else cache[path] = op === 'set' ? clone(data || {}) : deep(clone(cache[path]) || {}, clone(data || {}));
+      persist(); fire(path); return Promise.resolve({ ok: true });
+    }
+    function doc(p) {
+      var path = mp(p);
+      return {
+        onSnapshot: function (cb) { var s = { path: path, fire: function () { cb(snap(path)); } }; docSubs.push(s); setTimeout(s.fire, 0); return function () { docSubs = docSubs.filter(function (x) { return x !== s; }); }; },
+        get: function () { return Promise.resolve(snap(path)); },
+        update: function (patch) { return write('update', path, patch); },
+        set: function (d) { return write('set', path, d); },
+        delete: function () { return write('delete', path, null); }
+      };
+    }
+    function collection(c) {
+      var col = mp(c);
+      return {
+        onSnapshot: function (cb) {
+          var s = { col: col, fire: function () { var docs = []; Object.keys(cache).forEach(function (p) { if (p.indexOf(col + '/') !== 0) return; var id = p.slice(col.length + 1); if (id.indexOf('/') >= 0) return; docs.push({ id: id, data: function () { return clone(cache[p]); } }); }); cb({ docs: docs }); } };
+          colSubs.push(s); setTimeout(s.fire, 0); return function () { colSubs = colSubs.filter(function (x) { return x !== s; }); };
+        },
+        doc: function (id) { return doc(c + '/' + id); }
+      };
+    }
+    window.VicioStore = {
+      db: { doc: doc, collection: collection },
+      training: true,
+      role: function () { return 'staff'; },
+      ready: function () { return Promise.resolve('staff'); },
+      watchShifts: function (fn) { var c = shiftsCsv(); setTimeout(function () { fn(c); }, 0); },
+      notify: function () { return Promise.resolve({ ok: true, sent: false }); },
+      forgetPin: function () {}
+    };
+  }
 })();
