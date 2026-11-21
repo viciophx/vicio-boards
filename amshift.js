@@ -332,6 +332,39 @@
         '.x-all.armed,.x-all:active{background:var(--cherry,#8B1E1E);color:#fff}summary .cardhead{flex-wrap:wrap}.x-hnote{margin:6px 2px 2px;color:var(--muted,#666);font-size:14px;font-style:italic}');
       var r0 = render;
       render = function () { r0.apply(this, arguments); try { decorate(); } catch (err) {} };
+      /* Bartender view (Eric, Nov 20 2026): FOH views are Checklists · Host · Expo · Bartender. The Bartender screen shows who is
+         on the bar, online orders, the bartender's lists for today (shift lists on Friday and Saturday), the 86 list and a way into
+         the drink specs. Like Expo, each iPad remembers it is the bar iPad, so the evening switch lands on Bartender. */
+      var BAR_KEY = 'vicio_foh_svcrole';
+      function barWho() {
+        var nm = (function () { try { var x = JSON.parse(localStorage.getItem('vicio_foh_names') || 'null'); if (x && x.date === svcDate() && Array.isArray(x.names)) return x.names; } catch (err) {} var w = whoName(); return w ? [w] : []; })();
+        var ppl = (typeof stPeople === 'function' ? stPeople() : []).filter(function (p) { return nm.indexOf(p.name) < 0; });
+        return '<section class="card x-signin x-compact x-expowho"><div class="x-row"><b class="x-lbl">' + tt('On the bar', 'En la barra') + '</b>' +
+          nm.map(function (n) { return '<span class="x-tag">' + hx(n) + '<button type="button" class="btn x" data-fwho="rm" data-name="' + hx(n) + '" aria-label="' + tt('Remove', 'Quitar') + ' ' + hx(n) + '">\u00d7</button></span>'; }).join('') +
+          '<select data-fwho-sel="1" aria-label="' + tt('Add someone on the bar', 'Agregar a alguien en la barra') + '"><option value="">' + (nm.length ? tt('Add someone\u2026', 'Agregar a alguien\u2026') : tt('Pick your name\u2026', 'Elige tu nombre\u2026')) + '</option>' +
+          ppl.map(function (p) { return '<option value="' + hx(p.name) + '">' + hx(p.name) + '</option>'; }).join('') + '<option value="__other">' + tt('Someone else\u2026', 'Otra persona\u2026') + '</option></select>' +
+          '<input type="text" id="fwho-txt" class="x-other" placeholder="' + tt('Name', 'Nombre') + '" autocomplete="off" hidden><button type="button" class="btn primary x-other" data-fwho="in" hidden>' + tt('Add', 'Agregar') + '</button></div></section>';
+      }
+      function barView() {
+        var d = ui.date, done = (S.shift && S.shift.done) || {};
+        var lists = ['bar_open', 'bar_mid', 'bar_close'].map(function (k) { return listCard(k, ROLES.bar + ' ' + ({ bar_open: tt('open', 'apertura'), bar_mid: tt('mid shift', 'medio turno'), bar_close: tt('close', 'cierre') })[k], d, done); }).join('');
+        return (typeof dateBar === 'function' ? dateBar('') : '') + barWho() +
+          '<div class="grid x-expotop"><section class="card svcorders" id="svc-orders"></section>' +
+          '<section class="card"><div class="cardhead"><h3>' + tt('Drink specs', 'Recetas de bebidas') + '</h3></div><p class="status">' + tt('Pours, method and garnish for every drink.', 'Medidas, m\u00e9todo y garnish de cada bebida.') + '</p><button type="button" class="btn primary" data-barspecs="1">' + tt('Open drink specs', 'Abrir recetas') + '</button></section></div>' +
+          lists + (typeof e86Card === 'function' ? e86Card() : '');
+      }
+      (function barMode() {
+        if (typeof MODES === 'undefined' || !MODES.__split || !(VIEWS.today && /expoView/.test(String(VIEWS.today)))) return setTimeout(barMode, 200);
+        if (MODES.__bar) return; MODES.__bar = true;
+        MODES.push(['bar', tt('Bartender', 'Bartender')]);
+        var sm1 = setMode; setMode = function (m) { var r = sm1(m); if (m === 'bar') { try { localStorage.setItem(BAR_KEY, 'bar'); } catch (err) {} ui.barView = true; } return r; };
+        var cm1 = curMode; curMode = function () { var m = cm1(); var rl = ''; try { rl = localStorage.getItem(BAR_KEY) || ''; } catch (err) {} var ov = typeof modeOverride === 'function' ? modeOverride() : null; return m === 'service' && rl === 'bar' && ov !== 'service' ? 'bar' : m; };
+        var t1 = VIEWS.today; VIEWS.today = function () { return ui.mode === 'bar' ? barView() : t1.apply(this, arguments); };
+        document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-barspecs]'); if (!b) return; ui.barView = true; try { localStorage.setItem('vicio_foh_barview', '1'); } catch (err) {} ui.tab = 'drinks'; render(); });
+        ui.mode = curMode(); if (ui.mode === 'bar') ui.barView = true;
+        render();
+      })();
+      var r2 = render; render = function () { r2.apply(this, arguments); try { if (ui.mode === 'bar' && ui.tab === 'today') { var h1 = document.querySelector('#head h1'); if (h1) h1.textContent = tt('Bartender', 'Bartender'); } } catch (err) {} };
       window.VicioAM = { amDay: amDay, crew: crew, hostLayout: hostLayout };
       render();
       /* The order flips at 4 PM; redraw once a minute when nobody is typing. */
