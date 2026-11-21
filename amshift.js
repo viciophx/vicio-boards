@@ -419,9 +419,66 @@
         };
         render();
       })();
+      /* Training (Eric, Nov 20 2026): a Training button after Bartender opens the Training page, which now starts with two
+         courses: our drinks and how to sell them, and our food and how to sell it. Item lists and quiz questions are built from
+         the Drinks page and the Menu, so they stay current. The pizza story is Eric's own words. */
+      (function training() {
+        if (typeof TRACKS === 'undefined' || typeof TRACKQ === 'undefined' || typeof MENU === 'undefined' || typeof DRINKS === 'undefined' || typeof MODES === 'undefined' || !MODES.__bar) return setTimeout(training, 200);
+        if (TRACKS.__sell) return; TRACKS.__sell = true;
+        var mk = TRACKS.find(function (t) { return t.id === 'mustknow'; });
+        if (mk) mk.material.forEach(function (m) { if (m[0] === 'Hours') { m[1] = 'Thursday 5 PM to midnight. Friday and Saturday noon to midnight. Sunday to Wednesday closed.'; m[3] = 'Jueves 5 PM a medianoche. Viernes y s\u00e1bado mediod\u00eda a medianoche. Domingo a mi\u00e9rcoles cerrado.'; } });
+        var shuf = function (a) { return a.map(function (x) { return [Math.random(), x]; }).sort(function (x, y) { return x[0] - y[0]; }).map(function (x) { return x[1]; }); };
+        function whatsIn(items, qEn, qEs) {
+          return items.filter(function (x) { return x[1]; }).map(function (x) {
+            var wrong = shuf(items.filter(function (y) { return y[1] && y[1] !== x[1]; })).slice(0, 3).map(function (y) { return y[1]; });
+            return { en: [qEn.replace('{n}', x[0]), [x[1]].concat(wrong)], es: [qEs.replace('{n}', x[0]), [x[1]].concat(wrong)], key: 0 };
+          });
+        }
+        /* Food */
+        var food = MENU.filter(function (g) { return !/drink|beer|bar/i.test(g[0]); });
+        var pies = food.filter(function (g) { return /pizza/i.test(g[0]); }).flatMap(function (g) { return g[2].map(function (i) { return [i[0], i[3]]; }); });
+        var fMat = [
+          ['Our pizza', 'Our pizza is built on a high quality Italian flour. We bake a focaccia: very light and airy. Because the dough is such high hydration, it doesn\u2019t feel heavy, even though it\u2019s thick. It is not like a Chicago style deep dish. We sell whole 8x10 pans, never slices.',
+            'Nuestra pizza', 'Nuestra pizza est\u00e1 hecha con harina italiana de alta calidad. Horneamos una focaccia: muy ligera y aireada. Como la masa lleva mucha hidrataci\u00f3n, no se siente pesada aunque es gruesa. No es como una deep dish estilo Chicago. Vendemos charolas enteras de 8x10, nunca rebanadas.'],
+          ['How to say it at the table', 'Lead with the crust: \u201cOur pizza is a focaccia made with Italian flour. It\u2019s thick, but it\u2019s light and airy, nothing like a Chicago deep dish.\u201d Then help them pick by what they like: a classic, something spicy, or one with no red sauce.',
+            'C\u00f3mo decirlo en la mesa', 'Empieza con la masa: \u201cNuestra pizza es una focaccia hecha con harina italiana. Es gruesa, pero ligera y aireada, nada que ver con una deep dish de Chicago.\u201d Luego ay\u00fadales a escoger seg\u00fan lo que les gusta: una cl\u00e1sica, algo picante o una sin salsa roja.']
+        ].concat(food.map(function (g) { return [g[0], g[2].map(function (i) { return i[0] + (i[1] ? ' (' + i[1] + ')' : '') + (i[3] ? ': ' + i[3] : ''); }).join('. ') + '.', g[0], g[2].map(function (i) { return i[0] + (i[1] ? ' (' + i[1] + ')' : '') + (i[3] ? ': ' + i[3] : ''); }).join('. ') + '.']; }));
+        var fQuiz = [
+          { en: ['What is our pizza crust?', ['A focaccia made with high quality Italian flour', 'A thin New York crust', 'A Chicago style deep dish', 'A Neapolitan crust']], es: ['\u00bfQu\u00e9 es la masa de nuestra pizza?', ['Una focaccia hecha con harina italiana de alta calidad', 'Una masa delgada estilo Nueva York', 'Una deep dish estilo Chicago', 'Una masa napolitana']], key: 0 },
+          { en: ['Why doesn\u2019t our thick crust feel heavy?', ['The dough is high hydration, so it bakes light and airy', 'It is baked twice', 'It is made with whole wheat', 'It is fried']], es: ['\u00bfPor qu\u00e9 nuestra masa gruesa no se siente pesada?', ['La masa lleva mucha hidrataci\u00f3n, as\u00ed que sale ligera y aireada', 'Se hornea dos veces', 'Es de trigo integral', 'Es frita']], key: 0 },
+          { en: ['A guest asks if it\u2019s like a Chicago deep dish. You say:', ['No. It\u2019s thick but light and airy: a focaccia, not a deep dish', 'Yes, it\u2019s the same thing', 'It\u2019s a thin crust', 'It\u2019s gluten free']], es: ['Un cliente pregunta si es como una deep dish de Chicago. T\u00fa dices:', ['No. Es gruesa pero ligera y aireada: una focaccia, no una deep dish', 'S\u00ed, es lo mismo', 'Es masa delgada', 'Es sin gluten']], key: 0 },
+          { en: ['How do we sell pizza?', ['Whole 8x10 pans, never slices', 'By the slice', '12 inch rounds', 'Half pans only']], es: ['\u00bfC\u00f3mo vendemos la pizza?', ['Charolas enteras de 8x10, nunca rebanadas', 'Por rebanada', 'Redondas de 12 pulgadas', 'Solo medias charolas']], key: 0 }
+        ].concat(whatsIn(pies, 'What is on the {n}?', '\u00bfQu\u00e9 lleva la {n}?'));
+        /* Drinks */
+        var DG = ['Margaritas', 'Cocktails', 'Shots', 'Mocktails'];
+        var dk = DRINKS.filter(function (d) { return DG.indexOf(d.group) >= 0; });
+        var dMat = [
+          ['How to sell a drink', 'Offer a drink as soon as guests sit. Name one or two by what is in them, not just the name: \u201cOur Guava Goddess is tequila and mezcal with guava, Aperol, lime, grapefruit and muddled basil.\u201d For a guest who isn\u2019t drinking, offer a mocktail. If a drink is spicy, say so.',
+            'C\u00f3mo vender una bebida', 'Ofrece una bebida en cuanto se sienten. Menciona una o dos por lo que llevan, no solo el nombre: \u201cNuestra Guava Goddess lleva tequila y mezcal con guayaba, Aperol, lim\u00f3n, toronja y albahaca machacada.\u201d Si el cliente no toma alcohol, ofrece un mocktail. Si una bebida es picante, d\u00edselo.']
+        ].concat(DG.map(function (g) { var its = dk.filter(function (d) { return d.group === g; }); return [g, its.map(function (d) { return (d.name + (d.price ? ' (' + d.price + ')' : '') + (d.menu ? ': ' + d.menu : '') + (d.warn ? '. ' + d.warn : '')).replace(/\.+$/, ''); }).join('. ') + '.', g, its.map(function (d) { return (d.name + (d.price ? ' (' + d.price + ')' : '') + (d.menu ? ': ' + d.menu : '') + (d.warn ? '. ' + d.warn : '')).replace(/\.+$/, ''); }).join('. ') + '.']; }).filter(function (m) { return m[1] !== '.'; }));
+        var spicy = dk.filter(function (d) { return /spicy/i.test(d.warn || ''); }), mild = dk.filter(function (d) { return !/spicy/i.test(d.warn || '') && d.group !== 'Mocktails'; });
+        var dQuiz = [
+          { en: ['What is our featured cocktail?', ['Guava Goddess', 'Mezcal Paloma', 'Vegas Bomb', 'Skinny Margarita']], es: ['\u00bfCu\u00e1l es nuestro c\u00f3ctel destacado?', ['Guava Goddess', 'Mezcal Paloma', 'Vegas Bomb', 'Skinny Margarita']], key: 0 },
+          { en: ['A guest isn\u2019t drinking alcohol. What do you offer?', ['A mocktail, like Agua de Jamaica or the Prickly Pear', 'A Green Tea shot', 'A Skinny Margarita', 'Nothing']], es: ['Un cliente no toma alcohol. \u00bfQu\u00e9 le ofreces?', ['Un mocktail, como el Agua de Jamaica o el Prickly Pear', 'Un shot de Green Tea', 'Una Skinny Margarita', 'Nada']], key: 0 }
+        ];
+        if (spicy.length && mild.length >= 3) dQuiz.push({ en: ['Which of these drinks is spicy?', [spicy[0].name].concat(shuf(mild).slice(0, 3).map(function (d) { return d.name; }))], es: ['\u00bfCu\u00e1l de estas bebidas es picante?', [spicy[0].name].concat(shuf(mild).slice(0, 3).map(function (d) { return d.name; }))], key: 0 });
+        dQuiz = dQuiz.concat(whatsIn(dk.map(function (d) { return [d.name, d.menu]; }), 'What is in the {n}?', '\u00bfQu\u00e9 lleva la {n}?'));
+        var add = [
+          { id: 'sell_drinks', name: ['Our drinks and how to sell them', 'Nuestras bebidas y c\u00f3mo venderlas'], who: 'Every FOH person', material: dMat, quiz: dQuiz, signoff: [] },
+          { id: 'sell_food', name: ['Our food and how to sell it', 'Nuestra comida y c\u00f3mo venderla'], who: 'Every FOH person', material: fMat, quiz: fQuiz, signoff: [] }];
+        add.reverse().forEach(function (t) {
+          TRACKS.unshift(t);
+          var conv = function (L) { return t.quiz.map(function (x) { var o = x[L][1]; return [x[L][0], o[x.key], o.filter(function (_, i) { return i !== x.key; })]; }); };
+          TRACKQ['track_' + t.id] = { name: t.name[0], nameEs: t.name[1], q: conv('en'), qes: conv('es') };
+        });
+        MODES.push(['train', tt('Training', 'Entrenamiento')]);
+        if (typeof SVC_TABS !== 'undefined' && SVC_TABS.indexOf('training') < 0) SVC_TABS.push('training');   /* so Training also opens during service */
+        var sm2 = setMode; setMode = function (m) { if (m === 'train') { ui.tab = 'training'; ui.trk = null; return; } return sm2(m); };
+        render();
+      })();
       /* Drink photos on the Drinks page are 300 px wide, height to match (Eric, Nov 20 2026). */
       style('body.x-drinks #view img.pimg{width:300px!important;max-width:100%!important;height:auto!important;aspect-ratio:auto!important;object-fit:contain!important}');
-      var r2 = render; render = function () { r2.apply(this, arguments); try { document.body.classList.toggle('x-drinks', ui.tab === 'drinks'); } catch (err) {} try { if (ui.mode === 'bar' && ui.tab === 'today') { var h1 = document.querySelector('#head h1'); if (h1) h1.textContent = tt('Bartender', 'Bartender'); } } catch (err) {} };
+      var r2 = render; render = function () { r2.apply(this, arguments); try { document.body.classList.toggle('x-drinks', ui.tab === 'drinks'); document.querySelectorAll('#head [data-act="mode"]').forEach(function (b) { var tr = b.dataset.v === 'train'; if (ui.tab === 'training') b.setAttribute('aria-pressed', tr ? 'true' : 'false'); else if (tr) b.setAttribute('aria-pressed', 'false'); }); } catch (err) {} try { if (ui.mode === 'bar' && ui.tab === 'today') { var h1 = document.querySelector('#head h1'); if (h1) h1.textContent = tt('Bartender', 'Bartender'); } } catch (err) {} };
       window.VicioAM = { amDay: amDay, crew: crew, hostLayout: hostLayout };
       render();
       /* The order flips at 4 PM; redraw once a minute when nobody is typing. */
