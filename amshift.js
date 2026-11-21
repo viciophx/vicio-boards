@@ -239,6 +239,11 @@
         return out;
       };
       sections.__drop = sections.__ev = true;
+      /* Items taken off every list (Eric, Nov 21 2026): leftover ramekins on the Expo close. Also off the busser lists on
+         Friday and Saturday, where the Expo items move. */
+      var GONE = ['expo_svc_2_1'], s1 = sections;
+      sections = function (key, d) { return s1(key, d).map(function (s) { return [s[0], s[1].filter(function (i) { return GONE.indexOf(i[0]) < 0; })].concat(s.slice(2)); }).filter(function (s) { return s[1].length; }); };
+      sections.__drop = sections.__ev = true;
       function wrap(fn) {
         return function (key, title, d, done) {
           if (key === 'expo_svc' && amDay(d)) return '';
