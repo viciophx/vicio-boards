@@ -364,6 +364,61 @@
         ui.mode = curMode(); if (ui.mode === 'bar') ui.barView = true;
         render();
       })();
+      /* Reservations floor (Eric, Nov 20 2026): tap a table or stool to select it, tap it again to deselect. Several can be
+         selected at once (B1, B2 and B3 for a party of 3 at the bar); the panel then sets status, party, guests, server and
+         note on all of them together. The guest count is kept on the first one, so tonight's covers are not counted twice. */
+      (function multiSeat() {
+        if (typeof seatClick !== 'function' || typeof seatPanel !== 'function' || typeof tblHtml !== 'function' || typeof seatSet !== 'function') return setTimeout(multiSeat, 200);
+        if (seatClick.__multi) return;
+        ui.tMulti = ui.tMulti || [];
+        var sc0 = seatClick, sp0 = seatPanel, th0 = tblHtml;
+        var tbl = function (id) { return tables().find(function (x) { return x.id === id; }); };
+        var sel = function () { return (ui.tMulti || []).filter(function (id) { return tbl(id); }); };
+        seatClick = function (a, t) {
+          if (a === 'tsel' && !ui.seatEdit && !ui.rvPick && !ui.wlPick) {
+            if (Date.now() < ((typeof drag !== 'undefined' && drag.skipUntil) || 0)) return true;
+            var id = t.dataset.id, cur = sel(), i = cur.indexOf(id);
+            if (i >= 0) cur.splice(i, 1); else cur.push(id);
+            ui.tMulti = cur; ui.tSel = cur.length ? cur[cur.length - 1] : null; ui.tDel = null; render(); return true;
+          }
+          if (a === 'tarea' || a === 'tedit') ui.tMulti = [];
+          var ids = sel();
+          if (/^tm/.test(a)) {
+            var g = function (x) { return document.getElementById(x); };
+            if (a === 'tmnone') { ui.tMulti = []; ui.tSel = null; render(); return true; }
+            if (a === 'tmst') { var v = t.dataset.v; ids.forEach(function (id) { seatSet(id, v === 'open' ? { st: 'open', at: null } : { st: v, at: Date.now() }); }); render(); return true; }
+            if (a === 'tmclear') { ids.forEach(function (id) { seatSet(id, { st: 'open', party: '', size: null, server: '', note: '', at: null }); }); render(); return true; }
+            if (a === 'tmsave') {
+              var sz = g('tm-size').value, names = ids.map(function (id) { return (tbl(id) || {}).n; }).join(', ');
+              ids.forEach(function (id, k) {
+                var p = { party: g('tm-party').value.trim(), size: k === 0 && sz !== '' ? Math.max(1, +sz) : null, server: g('tm-server').value, note: (g('tm-note').value.trim() + (ids.length > 1 ? ' (together: ' + names + ')' : '')).trim() };
+                var st = tstate(id); if (!st.st || st.st === 'open') { p.st = 'seated'; p.at = Date.now(); }
+                seatSet(id, p);
+              });
+              document.activeElement && document.activeElement.blur(); render(); return true;
+            }
+          }
+          if (a === 'tsel') ui.tMulti = [t.dataset.id];
+          return sc0(a, t);
+        };
+        seatClick.__multi = true;
+        tblHtml = function (t) { var h = th0(t); return sel().indexOf(t.id) >= 0 && h.indexOf(' sel"') < 0 ? h.replace('class="tbl ', 'class="tbl sel ') : h; };
+        seatPanel = function () {
+          var ids = sel();
+          if (ui.seatEdit || ids.length < 2) return sp0();
+          var ts = ids.map(tbl), seats = ts.reduce(function (n, x) { return n + (+x.seats || 0); }, 0), st0 = tstate(ids[0]), servers = stPeople().filter(function (p) { return p.group !== 'Kitchen'; });
+          var cur = ids.every(function (id) { return (tstate(id).st || 'open') === (st0.st || 'open'); }) ? (st0.st || 'open') : '';
+          return '<section class="card edge"><div class="cardhead"><h3>' + hx(ts.map(function (x) { return x.n; }).join(' \u00b7 ')) + '</h3><span class="count">' + ids.length + tt(' selected \u00b7 ', ' seleccionadas \u00b7 ') + seats + tt(' seats', ' lugares') + '</span></div>' +
+            '<p class="status">' + tt('Tap a table again to take it out of the group.', 'Toca una mesa otra vez para quitarla del grupo.') + '</p>' +
+            '<div class="stbtns">' + TST.map(function (x) { return '<button class="btn ' + x[0] + (cur === x[0] ? ' on' : '') + '" data-act="tmst" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>' +
+            '<div class="fields"><label class="fld" for="tm-party">' + tt('Party name', 'Nombre') + '<input type="text" id="tm-party" value="' + hx(st0.party || '') + '" placeholder="' + tt('Name or reservation', 'Nombre o reservaci\u00f3n') + '" autocomplete="off" autocorrect="off"></label>' +
+            '<label class="fld" for="tm-size">' + tt('Guests (whole party)', 'Personas (todo el grupo)') + '<input type="number" id="tm-size" min="1" max="60" value="' + hx(st0.size || '') + '" inputmode="numeric"></label>' +
+            '<label class="fld" for="tm-server">' + tt('Server', 'Mesero') + '<select id="tm-server"><option value="">' + tt('None', 'Nadie') + '</option>' + servers.map(function (p) { return '<option' + (st0.server === p.name ? ' selected' : '') + '>' + hx(p.name) + '</option>'; }).join('') + '</select></label>' +
+            '<label class="fld" for="tm-note">' + tt('Note', 'Nota') + '<input type="text" id="tm-note" value="' + hx(String(st0.note || '').replace(/\s*\(together: [^)]*\)$/, '')) + '" placeholder="' + tt('Birthday, high chair, allergy', 'Cumplea\u00f1os, silla alta, alergia') + '" autocomplete="off"></label></div>' +
+            '<div class="nav"><button class="btn primary" data-act="tmsave">' + tt('Seat together', 'Sentar juntos') + '</button><button class="btn" data-act="tmclear">' + tt('Clear all', 'Limpiar todas') + '</button><button class="btn" data-act="tmnone">' + tt('Deselect all', 'Quitar selecci\u00f3n') + '</button></div></section>';
+        };
+        render();
+      })();
       var r2 = render; render = function () { r2.apply(this, arguments); try { if (ui.mode === 'bar' && ui.tab === 'today') { var h1 = document.querySelector('#head h1'); if (h1) h1.textContent = tt('Bartender', 'Bartender'); } } catch (err) {} };
       window.VicioAM = { amDay: amDay, crew: crew, hostLayout: hostLayout };
       render();
