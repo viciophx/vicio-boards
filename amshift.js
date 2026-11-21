@@ -419,7 +419,9 @@
         };
         render();
       })();
-      var r2 = render; render = function () { r2.apply(this, arguments); try { if (ui.mode === 'bar' && ui.tab === 'today') { var h1 = document.querySelector('#head h1'); if (h1) h1.textContent = tt('Bartender', 'Bartender'); } } catch (err) {} };
+      /* Drink photos on the Drinks page are 300 px wide, height to match (Eric, Nov 20 2026). */
+      style('body.x-drinks #view img.pimg{width:300px!important;max-width:100%!important;height:auto!important;aspect-ratio:auto!important;object-fit:contain!important}');
+      var r2 = render; render = function () { r2.apply(this, arguments); try { document.body.classList.toggle('x-drinks', ui.tab === 'drinks'); } catch (err) {} try { if (ui.mode === 'bar' && ui.tab === 'today') { var h1 = document.querySelector('#head h1'); if (h1) h1.textContent = tt('Bartender', 'Bartender'); } } catch (err) {} };
       window.VicioAM = { amDay: amDay, crew: crew, hostLayout: hostLayout };
       render();
       /* The order flips at 4 PM; redraw once a minute when nobody is typing. */
