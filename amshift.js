@@ -409,7 +409,20 @@
   (function kstart() {
     if (!kready()) return setTimeout(kstart, 150);
     var r0 = render;
-    render = function () { r0.apply(this, arguments); try { kdecorate(); } catch (e) {} };
+    render = function () { r0.apply(this, arguments); try { kdecorate(); } catch (e) {} try { svcRow(); } catch (e) {} };
+    /* BOH Service header on one row (Eric, Nov 20 2026): the title, Prep · Service · Dough and the date side by side. */
+    style('.x-srow{display:flex;flex-wrap:wrap;align-items:center;gap:10px 24px;margin:0 0 14px}.x-srow h1{margin:0!important;line-height:1}.x-srow .modesw{margin:0}' +
+      '.x-srow .bar{margin:0}.x-srow .bar .nav{margin:0}.x-srow .bar .date{font-size:18px}');
+    function svcRow() {
+      if (ui.tab !== 'today' || ui.mode !== 'service') return;
+      var hd = document.getElementById('head'); if (!hd || hd.querySelector('.x-srow')) return;
+      var h1 = hd.querySelector('h1'), sw = hd.querySelector('.modesw'), bar = document.querySelector('#view > .bar');
+      if (!(h1 && sw)) return;
+      var row = document.createElement('div'); row.className = 'x-srow';
+      var stt = sw.querySelector('.status'); if (stt) { var seg = sw.querySelector('.seg2'); if (seg) seg.title = stt.textContent; stt.remove(); }
+      row.appendChild(h1); row.appendChild(sw); if (bar) row.appendChild(bar);
+      hd.insertBefore(row, hd.firstChild);
+    }
     window.VicioAM = { amDay: amDay };
     render();
   })();
