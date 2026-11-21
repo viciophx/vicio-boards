@@ -186,8 +186,23 @@
       return typeof LISTS === 'object' && LISTS && LISTS.bar_open && LISTS.expo_svc && typeof sections === 'function' && typeof listCard === 'function' && typeof listRow === 'function' &&
         typeof shiftsOn === 'function' && typeof mins === 'function' && typeof ROLES === 'object' && typeof render === 'function' && typeof S !== 'undefined' && typeof iso === 'function' && typeof whoName === 'function' && typeof first === 'function';
     }
+    /* Bar specs from the bartenders' handwritten tickets (Eric, Nov 20 2026). Only drinks with no spec yet, or not on the
+       Drinks page at all; where a ticket disagrees with a spec already on the board, the board's spec stays until Eric says. */
+    function barSpecs() {
+      if (typeof DRINKS === 'undefined' || !Array.isArray(DRINKS) || DRINKS.__tickets) return;
+      DRINKS.__tickets = true;
+      var note = 'From the bar\u2019s handwritten spec tickets, Nov 2026.';
+      DRINKS.forEach(function (d) {
+        if (d.id === 'tequila_lemon_drop' && !d.spec) Object.assign(d, { build: [['1 oz', 'Tequila'], ['0.25 oz', 'Triple sec'], ['0.5 oz', 'Lemon juice'], ['0.5 oz', 'Simple syrup']], notes: [note], spec: true });
+      });
+      if (!DRINKS.some(function (d) { return d.id === 'la_culona'; }))
+        DRINKS.push({ id: 'la_culona', name: 'La Culona', group: 'Cocktails', price: '', menu: 'Rum, limoncello, prickly pear, orange liqueur, coconut, habanero bitters', glass: '', ice: '',
+          build: [['1 oz', 'Bacardi'], ['1 oz', 'Limoncello'], ['0.5 oz', 'Prickly pear'], ['0.5 oz', 'Triple sec'], ['0.25 oz', 'Coconut'], ['2 dashes', 'Habanero bitters']],
+          method: '', rim: '', garnish: '', notes: [note, 'Price, glass and method not on the ticket yet.'], warn: 'Spicy: habanero bitters.', spec: true });
+    }
     (function start() {
       if (!fready()) return setTimeout(start, 150);
+      try { barSpecs(); } catch (err) {}
       Object.keys(NEW).forEach(function (k) { if (!LISTS[k]) LISTS[k] = NEW[k]; });
       if (typeof ES === 'object' && ES) Object.keys(SP).forEach(function (k) { if (ES[k] == null) ES[k] = SP[k]; });
       var s0 = sections;
