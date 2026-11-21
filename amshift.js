@@ -478,7 +478,27 @@
       })();
       /* Drink photos on the Drinks page are 300 px wide, height to match (Eric, Nov 20 2026). */
       style('body.x-drinks #view img.pimg{width:300px!important;max-width:100%!important;height:auto!important;aspect-ratio:auto!important;object-fit:contain!important}');
-      var r2 = render; render = function () { r2.apply(this, arguments); try { document.body.classList.toggle('x-drinks', ui.tab === 'drinks'); document.querySelectorAll('#head [data-act="mode"]').forEach(function (b) { var tr = b.dataset.v === 'train'; if (ui.tab === 'training') b.setAttribute('aria-pressed', tr ? 'true' : 'false'); else if (tr) b.setAttribute('aria-pressed', 'false'); }); } catch (err) {} try { if (ui.mode === 'bar' && ui.tab === 'today') { var h1 = document.querySelector('#head h1'); if (h1) h1.textContent = tt('Bartender', 'Bartender'); } } catch (err) {} };
+      /* Bartender on the Vicio iPhone (Eric, Nov 20 2026): on a phone-sized screen in Bartender view the page is laid out for
+         the phone (proper width, one column, big tap targets). iPads and the other views are left exactly as they are. */
+      function barPhone() {
+        var phone = Math.min(screen.width || 9999, screen.height || 9999) < 600, on = phone && ui.mode === 'bar';
+        document.body.classList.toggle('x-barphone', on);
+        var m = document.getElementById('x-barvp');
+        if (on && !m) { m = document.createElement('meta'); m.id = 'x-barvp'; m.name = 'viewport'; m.content = 'width=device-width, initial-scale=1, viewport-fit=cover'; document.head.appendChild(m); }
+        else if (!on && m) m.remove();
+      }
+      style('body.x-barphone{overflow-x:hidden}' +
+        'body.x-barphone #view, body.x-barphone #head{min-width:0!important;max-width:100vw}' +
+        'body.x-barphone #head .x-hrow{display:block!important}body.x-barphone #head h1{font-size:30px!important;margin:0 0 8px!important}' +
+        'body.x-barphone #head .modesw{display:block;margin:0 0 8px}body.x-barphone #head .seg2{display:grid!important;grid-template-columns:repeat(3,1fr);gap:4px;border-radius:16px!important}body.x-barphone #head .seg2 button{flex:1 1 auto;min-height:44px;padding:6px 10px;font-size:13px}' +
+        'body.x-barphone #head .x-hc2, body.x-barphone #head .x-hc3{display:block!important}body.x-barphone .shiftbar.x-mini, body.x-barphone .shiftbar.x-top{max-width:none;min-width:0}' +
+        'body.x-barphone .grid, body.x-barphone .x-expotop{display:block!important}body.x-barphone .grid > *, body.x-barphone .x-expotop > *{margin-bottom:12px}' +
+        'body.x-barphone .card{padding:12px!important}body.x-barphone .x-expowho .x-row{flex-wrap:wrap!important}body.x-barphone .x-expowho select{flex:1 1 100%!important;max-width:none!important;min-height:44px}' +
+        'body.x-barphone ul.checks label{min-height:48px;align-items:center}body.x-barphone ul.checks input[type=checkbox]{width:28px;height:28px;flex:0 0 28px}' +
+        'body.x-barphone .bar .nav{flex-wrap:wrap;gap:6px}body.x-barphone .bar .date{font-size:16px}' +
+        'body.x-barphone .dtop{flex-wrap:wrap}body.x-barphone #drink-q{flex:1 1 100%;min-height:44px;font-size:16px}' +
+        'body.x-barphone img.pimg{width:100%!important;max-width:300px!important}body.x-barphone .x-finote{font-size:15px}');
+      var r2 = render; render = function () { r2.apply(this, arguments); try { barPhone(); } catch (err) {} try { document.body.classList.toggle('x-drinks', ui.tab === 'drinks'); document.querySelectorAll('#head [data-act="mode"]').forEach(function (b) { var tr = b.dataset.v === 'train'; if (ui.tab === 'training') b.setAttribute('aria-pressed', tr ? 'true' : 'false'); else if (tr) b.setAttribute('aria-pressed', 'false'); }); } catch (err) {} try { if (ui.mode === 'bar' && ui.tab === 'today') { var h1 = document.querySelector('#head h1'); if (h1) h1.textContent = tt('Bartender', 'Bartender'); } } catch (err) {} };
       window.VicioAM = { amDay: amDay, crew: crew, hostLayout: hostLayout };
       render();
       /* The order flips at 4 PM; redraw once a minute when nobody is typing. */
