@@ -125,10 +125,9 @@
       'Water pitchers full: 2 at Bar, 1 at Host Stand': 'Jarras de agua llenas: 2 en la barra, 1 en el puesto de anfitri\u00f3n'
     };
     var ROLE_RE = { bar: /bartend/i, host: /bus|host|runner|expo/i };
-    /* New lists from the staff review (Kassandra and Mikayla, Eric's calls, Nov 20 2026). Shown only with ?newlists in the link
-       until Eric approves them for the crew. */
+    /* New lists from the staff review (Kassandra and Mikayla, Eric's calls, Nov 20 2026). Approved by Eric and live Nov 20 2026. */
     var HL = function (x) { return x; }, WD = function (x) { return x; };   /* set to hostLayout and word once the board is up */
-    var NEWL = /[?&]newlists\b/.test(location.search);
+    var NEWL = !/[?&]oldlists\b/.test(location.search);   /* live for the crew since Nov 20 2026 (Eric); ?oldlists shows the lists as they were */
     /* Opening set-up goes to whoever opens first, by the schedule: the bartender when the busser starts later (or there is no
        busser), the busser when they start together or the busser is in first. */
     var FIRST_IN = ['host_open_0_6', 'host_open_0_1', 'host_open_9_0', 'host_open_0_5', 'host_open_0_8', 'host_open_0_3', 'host_open_0_12', 'host_open_0_13', 'host_open_0_2', 'host_open_2_4', 'host_open_1_3', 'bar_open_0_0'];
@@ -342,7 +341,7 @@
     'Wash the dishes from the cart (the floor and bar clear them onto it)': 'Lava los platos del carrito (el piso y la barra los ponen ah\u00ed)' };
   function kready() { return typeof render === 'function' && typeof S !== 'undefined' && typeof ui !== 'undefined' && typeof shiftsOn === 'function' && typeof mins === 'function' && typeof fold === 'function' && typeof checklist === 'function' && typeof progress === 'function' && typeof iso === 'function'; }
   function kword(x) { return es() && RSP[x] ? RSP[x] : x; }
-  var KNEWL = /[?&]newlists\b/.test(location.search);
+  var KNEWL = !/[?&]oldlists\b/.test(location.search);
   function kdecorate() {
     var mid0 = document.querySelector('#view details[data-fold="midlist"]');
     if (KNEWL && mid0 && !document.querySelector('#view details[data-fold="dishlist"]')) {
