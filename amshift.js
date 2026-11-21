@@ -406,8 +406,23 @@
     mid.insertAdjacentHTML('afterend', fold('resetlist', hx(kword('Afternoon reset, before the 4 PM break')) + (cook.length ? ' \u00b7 ' + hx(cook.join(', ')) : ''), c + ' of ' + items.length, progress(Math.round(100 * c / items.length)) + checklist('shifts/' + d, items, done), c < items.length ? ' edge' : ' done'));
   }
   function first(n) { return String(n || '').trim().split(/\s+/)[0]; }
+  /* Green Chile Mozz Sticks batch (Eric, Nov 20 2026): per 5 lb bag of mozzarella, 16 oz deli green chile, 2 oz seis especias,
+     1 oz garlic powder, 4 eggs. Replaces the old "garlic parm butter, amount to be verified". */
+  function mozzCard() {
+    if (typeof BOOK === 'undefined' || !Array.isArray(BOOK) || BOOK.__mozz) return;
+    var x = null; BOOK.forEach(function (g) { (g.items || []).forEach(function (i) { if (i.id === 'mozz') x = i; }); });
+    if (!x) return; BOOK.__mozz = true;
+    x.sum = 'Giant mozz sticks mixed with green chile, seis especias and garlic, wrapped in a spring roll wrapper. Order of 3.';
+    x.ing = { cols: ['Ingredient', 'Per batch'], rows: [['Mozzarella, the pizza cheese', '1 bag, 5 lb'], ['Deli green chile', '16 oz'], ['Seis especias', '2 oz'], ['Garlic powder', '1 oz'], ['Eggs', '4'], ['Spring roll wrappers', '1 per stick']] };
+    x.steps = ['Mix the 5 lb bag of mozzarella with the green chile, seis especias and garlic powder.', 'Portion 2.25 oz of the cheese mix per stick.', 'Roll each portion in a spring roll wrapper.', 'Seal the edge with egg wash.', 'Hold cold until fried to order.'];
+    x.notes = ['Batch from Eric, Nov 20 2026.', 'To confirm: do the 4 eggs go in the cheese mix or in the egg wash?'];
+    x.esx = Object.assign({}, x.esx, { sum: 'Palitos grandes de mozzarella mezclada con chile verde, seis especias y ajo, envueltos en hoja de rollo primavera. Orden de 3.', ing: { cols: ['Ingrediente', 'Por tanda'], rows: [['Queso mozzarella (el de pizza)', '1 bolsa, 5 lb'], ['Chile verde de deli', '16 oz'], ['Seis especias', '2 oz'], ['Ajo en polvo', '1 oz'], ['Huevos', '4'], ['Hojas de rollo primavera', '1 por palito']] },
+      steps: ['Mezcle la bolsa de 5 lb de mozzarella con el chile verde, las seis especias y el ajo en polvo.', 'Porcione 2.25 oz de la mezcla por palito.', 'Enrolle cada porci\u00f3n en una hoja de rollo primavera.', 'Selle la orilla con huevo batido.', 'Mantenga en fr\u00edo hasta fre\u00edr a la orden.'],
+      notes: ['Tanda de Eric, 20 de nov 2026.', 'Por confirmar: \u00bflos 4 huevos van en la mezcla de queso o en el huevo batido?'] });
+  }
   (function kstart() {
     if (!kready()) return setTimeout(kstart, 150);
+    try { mozzCard(); } catch (e) {}
     var r0 = render;
     render = function () { r0.apply(this, arguments); try { kdecorate(); } catch (e) {} try { svcRow(); } catch (e) {} };
     /* BOH Service header on one row (Eric, Nov 20 2026): the title, Prep · Service · Dough and the date side by side. */
