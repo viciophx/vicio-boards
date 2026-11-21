@@ -104,6 +104,7 @@
       'Lunch check, around 2 PM': 'Revisi\u00f3n del almuerzo, como a las 2 PM', 'AM hand off, 3 to 4 PM': 'Entrega del turno AM, 3 a 4 PM', 'PM takeover, 4 PM': 'Relevo del turno PM, 4 PM',
       'Opening set-up': 'Preparaci\u00f3n de apertura', 'Floor and restock, shared with the busser': 'Piso y surtido, compartido con el busser', 'Shared with the busser': 'Compartido con el busser', 'From the floor list': 'De la lista del piso', 'Before doors open': 'Antes de abrir',
       'Clear dishes and place them on the cart (the kitchen washes them)': 'Recoge los platos y ponlos en el carrito (la cocina los lava)', 'Bar lights, TVs/A-V and music off': 'Luces del bar, TVs/A-V y m\u00fasica apagadas',
+      'Restock silverware at all stations (roll if needed)': 'Surtir cubiertos en todas las estaciones (enrollar si hace falta)', 'Roll silverware': 'Enrollar cubiertos', 'Bring in signs': 'Meter los letreros',
       'Host stand': 'Puesto de anfitri\u00f3n', 'Main restaurant': 'Restaurante', 'Outside': 'Afuera',
       'Turn on both marble lamps next to the host stand, by the entrance': 'Prende las dos l\u00e1mparas de m\u00e1rmol junto al puesto de anfitri\u00f3n, en la entrada',
       'Turn on the speaker and make sure it is plugged in, on top of the tower lamp': 'Prende la bocina y revisa que est\u00e9 conectada, encima de la l\u00e1mpara de torre',
@@ -134,7 +135,8 @@
     var SHARE_MID = ['host_mid_0_0', 'host_mid_0_1', 'host_mid_0_2', 'host_mid_0_3', 'host_mid_1_2', 'host_mid_3_1'];
     var TO_BAR_CLOSE = ['host_close_0_15', 'host_close_0_18'], OFF_HOST_CLOSE = ['host_close_0_15', 'host_close_0_18', 'host_close_0_19', 'host_close_0_20'];
     var DISH = 'Clear dishes and place them on the cart (the kitchen washes them)';
-    var RETXT = { host_mid_3_1: DISH, host_amoff_0_10: DISH, bar_close_4_1: 'Bar lights, TVs/A-V and music off' };
+    /* Silverware is only rolled, not washed, and the speaker stays inside (Eric, Nov 20 2026). */
+    var RETXT = { host_mid_3_1: DISH, host_amoff_0_10: DISH, bar_close_4_1: 'Bar lights, TVs/A-V and music off', host_open_2_0: 'Restock silverware at all stations (roll if needed)', host_close_0_7: 'Roll silverware', host_close_0_4: 'Bring in signs' };
     function opener(d) {
       var two = amDay(d), sh = vic(d).filter(function (w) { return !two || mins(w.start) < AM_BEFORE; });
       var first = function (re) { return sh.filter(function (w) { return re.test(w.role || ''); }).sort(function (a, b) { return mins(a.start) - mins(b.start); })[0] || null; };
