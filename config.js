@@ -3,3 +3,5 @@ window.VICIO_API = 'https://script.google.com/macros/s/AKfycbwnt4jHMTZlybdKiFQf6
 /* Nov 21 2026 changes (nov21.js): check-all on every list, AM cards, ice machine names, shorter floor, reservations, BOH Open
    mode. Both boards; it waits for the board on its own and does nothing on other pages. */
 try { var n21 = document.createElement('script'); n21.src = 'nov21.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(n21); } catch (e) {}
+/* Expo "What runs with what" as icons (runicons.js, Nov 21 2026). FOH only; it waits for the board on its own. */
+try { var ri = document.createElement('script'); ri.src = 'runicons.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(ri); } catch (e) {}
