@@ -476,6 +476,56 @@
         var sm2 = setMode; setMode = function (m) { if (m === 'train') { ui.tab = 'training'; ui.trk = null; return; } return sm2(m); };
         render();
       })();
+      /* New cocktail menu, coming soon (Eric, Nov 20 2026): the next bar menu, from Eric's "Bar Menu and Cocktail Specs" (Nov 12),
+         behind a button on the Drinks page. The current menu and its specs are not touched. Amounts the draft marked Check
+         show a Check tag. Crossed-out drinks on the draft are left out. */
+      var NM = [
+        ['Clasicos', [
+          ['Daiquiri', '$10', [['2 oz', 'Rum', 'Flor de Ca\u00f1a'], ['1 oz', 'Lime', 'Fresh lime juice'], ['0.75 oz', 'Simple syrup', 'House simple']]],
+          ['Centricomarg', '$10', [['1.5 oz', 'Tequila', 'Real de Valle'], ['2 oz', 'House sour mix', 'House'], ['0.5 oz', 'Orange liqueur', 'House orange liqueur']]],
+          ['Paloma', '$10', [['1.5 oz', 'Tequila', 'Real de Valle'], ['1 oz', 'Lime', 'Fresh lime juice'], ['1 bottle', 'Grapefruit soda', 'Grapefruit Jarritos']]],
+          ['Old Fashioned', '$12', [['2 oz', 'Whiskey', 'Old Grand Dad Bonded'], ['0.25 oz', 'Simple syrup', 'House simple'], ['2 dashes', 'Bitters', 'Angostura'], ['2 dashes', 'Bitters', 'Orange bitters']]],
+          ['Negroni', '$12', [['1 oz', 'Gin', 'Waterloo Gin'], ['CHECK', 'Bitter', 'Campari (amount not written, likely 1 oz)'], ['CHECK', 'Sweet vermouth', 'Cocchi Vermouth di Torino (amount not written, likely 1 oz)']]],
+          ['Martini (Dirty, Classic, Bone Dry)', '$12', [['2 oz + 0.75 oz', 'Dirty', 'Spirit plus olive brine'], ['2.5 oz + 0.5 oz', 'Classic', 'Spirit plus Dolin Dry Vermouth'], ['3 oz', 'Bone Dry', 'Spirit only']], 'Guest\u2019s choice of gin or vodka: Waterloo Gin or Tito\u2019s.'],
+          ['Espresso Martini', '$12', [['2 oz', 'Vodka', 'Tito\u2019s'], ['1 oz', 'Cold brew', 'Passport Cold Brew'], ['0.75 oz', 'Simple syrup', 'House simple']]]]],
+        ['Mas Mexicano', [
+          ['Funky Daiquiri', '$14', [['2 oz', 'Mexican agricole rum', 'Uruapan Blanco'], ['1 oz', 'Lime', 'Fresh lime juice'], ['0.75 oz', 'Piloncillo syrup', 'House']]],
+          ['Mexican Old Fashioned', '$14', [['2 oz', 'Mexican whiskey', 'Sierra Norte Yellow'], ['0.25 oz', 'Piloncillo syrup', 'House'], ['2 dashes', 'Bitters', 'Orange bitters'], ['2 dashes', 'Bitters', 'Fee Brothers Aztec Chocolate']]],
+          ['Mezcal Negroni', '$14', [['1 oz', 'Mezcal', 'Fidencio Espad\u00edn'], ['1 oz', 'Mexican bitter liqueur', 'Amargo Vallet'], ['1 oz', 'Sweet vermouth', 'Cocchi Vermouth di Torino'], ['3 drops', 'Saline', '20% saline solution']]],
+          ['Carajillo', '$14', [['1.5 oz', 'Espresso cold brew', 'House'], ['1.5 oz', 'Licor 43', 'Licor 43']]]]],
+        ['Specialties', [
+          ['Guava Goddess', '$16', [], 'Served as is: the current spec on the Drinks page.'],
+          ['Boilermaker', '$8', [['1', 'Miller High Life Pony', ''], ['1 shot', 'Tequila', '']]],
+          ['House Shots', '$8', [], 'Mexican Candy and Green Tea, current specs on the Drinks page.']]],
+        ['Beers', [
+          ['Miller High Life (full)', '$6', []], ['Miller High Life Pony', '$4', []], ['Church Music', '$7', []], ['Michelob Ultra', '$7', []], ['Dos XX', '$7', []],
+          ['Sana Clara', 'CHECK', [], 'Spelling and price to confirm.'], ['Sana Negra', 'CHECK', [], 'Spelling and price to confirm.']]]];
+      function newMenuView() {
+        var chk = '<span class="pill warn">' + tt('Check', 'Confirmar') + '</span>';
+        var card = function (it) {
+          var rows = it[2].map(function (b) { return '<li><b>' + (b[0] === 'CHECK' ? chk : hx(b[0])) + '</b> ' + hx(b[1]) + (b[2] ? ' <span class="muted">\u00b7 ' + hx(b[2]) + '</span>' : '') + '</li>'; }).join('');
+          return '<section class="card"><div class="cardhead"><h3>' + hx(it[0]) + '</h3>' + (it[1] === 'CHECK' ? chk : '<span class="count">' + hx(it[1]) + '</span>') + '</div>' +
+            (rows ? '<ul class="plain x-nmb">' + rows + '</ul>' : '') + (it[3] ? '<p class="status">' + hx(it[3]) + '</p>' : '') + '</section>';
+        };
+        return '<div class="dtop"><button type="button" class="btn primary" data-newmenu="off">\u2039 ' + tt('Current drinks', 'Bebidas actuales') + '</button></div>' +
+          '<section class="card edge"><div class="cardhead"><h3>' + tt('New cocktail menu', 'Nueva carta de c\u00f3cteles') + '</h3><span class="pill warn">' + tt('Coming soon', 'Muy pronto') + '</span></div>' +
+          '<p class="status">' + tt('Not live yet. Keep making and selling the current menu until we launch this one. Use this to learn the new specs.', 'Todav\u00eda no sale. Sigue preparando y vendiendo la carta actual hasta que lancemos esta. \u00dasala para aprender las recetas nuevas.') + '</p></section>' +
+          NM.map(function (g) { return '<h2>' + hx(g[0]) + '</h2><div class="grid">' + g[1].map(card).join('') + '</div>'; }).join('');
+      }
+      (function newMenu() {
+        if (typeof VIEWS === 'undefined' || typeof vDrinks !== 'function') return setTimeout(newMenu, 200);
+        if (VIEWS.drinks && VIEWS.drinks.__nm) return;
+        var d0 = VIEWS.drinks;
+        VIEWS.drinks = function () {
+          if (ui.newMenu) return newMenuView();
+          var h = d0.apply(this, arguments), btn = '<button type="button" class="btn x-nmbtn" data-newmenu="on">' + tt('New cocktail menu \u00b7 coming soon', 'Nueva carta \u00b7 muy pronto') + '</button>';
+          return h.indexOf('<div class="dtop">') >= 0 ? h.replace('<div class="dtop">', '<div class="dtop">' + btn) : '<div class="dtop">' + btn + '</div>' + h;
+        };
+        VIEWS.drinks.__nm = true;
+        document.addEventListener('click', function (e) { var b = e.target.closest && e.target.closest('[data-newmenu]'); if (!b) return; e.preventDefault(); ui.newMenu = b.dataset.newmenu === 'on'; render(); window.scrollTo(0, 0); });
+        style('.x-nmbtn{border-color:#F0A43A!important;color:#F0A43A!important;font-weight:700}.x-nmb{margin:6px 0 0;padding:0;list-style:none;display:grid;gap:6px}.x-nmb li{line-height:1.35}.x-nmb b{display:inline-block;min-width:74px}');
+        render();
+      })();
       /* Drink photos on the Drinks page are 300 px wide, height to match (Eric, Nov 20 2026). */
       style('body.x-drinks #view img.pimg{width:300px!important;max-width:100%!important;height:auto!important;aspect-ratio:auto!important;object-fit:contain!important}');
       /* Bartender on the Vicio iPhone (Eric, Nov 20 2026): on a phone-sized screen in Bartender view the page is laid out for
@@ -498,7 +548,7 @@
         'body.x-barphone .bar .nav{flex-wrap:wrap;gap:6px}body.x-barphone .bar .date{font-size:16px}' +
         'body.x-barphone .dtop{flex-wrap:wrap}body.x-barphone #drink-q{flex:1 1 100%;min-height:44px;font-size:16px}' +
         'body.x-barphone img.pimg{width:100%!important;max-width:300px!important}body.x-barphone .x-finote{font-size:15px}');
-      var r2 = render; render = function () { r2.apply(this, arguments); try { barPhone(); } catch (err) {} try { document.body.classList.toggle('x-drinks', ui.tab === 'drinks'); document.querySelectorAll('#head [data-act="mode"]').forEach(function (b) { var tr = b.dataset.v === 'train'; if (ui.tab === 'training') b.setAttribute('aria-pressed', tr ? 'true' : 'false'); else if (tr) b.setAttribute('aria-pressed', 'false'); }); } catch (err) {} try { if (ui.mode === 'bar' && ui.tab === 'today') { var h1 = document.querySelector('#head h1'); if (h1) h1.textContent = tt('Bartender', 'Bartender'); } } catch (err) {} };
+      var r2 = render; render = function () { r2.apply(this, arguments); try { barPhone(); } catch (err) {} try { if (ui.tab !== 'drinks') ui.newMenu = false; } catch (err) {} try { document.body.classList.toggle('x-drinks', ui.tab === 'drinks'); document.querySelectorAll('#head [data-act="mode"]').forEach(function (b) { var tr = b.dataset.v === 'train'; if (ui.tab === 'training') b.setAttribute('aria-pressed', tr ? 'true' : 'false'); else if (tr) b.setAttribute('aria-pressed', 'false'); }); } catch (err) {} try { if (ui.mode === 'bar' && ui.tab === 'today') { var h1 = document.querySelector('#head h1'); if (h1) h1.textContent = tt('Bartender', 'Bartender'); } } catch (err) {} };
       window.VicioAM = { amDay: amDay, crew: crew, hostLayout: hostLayout };
       render();
       /* The order flips at 4 PM; redraw once a minute when nobody is typing. */
