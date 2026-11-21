@@ -102,6 +102,8 @@
       ['Outside', ['host_open_0_12', 'host_open_0_13', 'host_open_0_2']]];
     var SP = {
       'Lunch check, around 2 PM': 'Revisi\u00f3n del almuerzo, como a las 2 PM', 'AM hand off, 3 to 4 PM': 'Entrega del turno AM, 3 a 4 PM', 'PM takeover, 4 PM': 'Relevo del turno PM, 4 PM',
+      'Opening set-up': 'Preparaci\u00f3n de apertura', 'Floor and restock, shared with the busser': 'Piso y surtido, compartido con el busser', 'Shared with the busser': 'Compartido con el busser', 'From the floor list': 'De la lista del piso', 'Before doors open': 'Antes de abrir',
+      'Clear dishes and place them on the cart (the kitchen washes them)': 'Recoge los platos y ponlos en el carrito (la cocina los lava)', 'Bar lights, TVs/A-V and music off': 'Luces del bar, TVs/A-V y m\u00fasica apagadas',
       'Host stand': 'Puesto de anfitri\u00f3n', 'Main restaurant': 'Restaurante', 'Outside': 'Afuera',
       'Turn on both marble lamps next to the host stand, by the entrance': 'Prende las dos l\u00e1mparas de m\u00e1rmol junto al puesto de anfitri\u00f3n, en la entrada',
       'Turn on the speaker and make sure it is plugged in, on top of the tower lamp': 'Prende la bocina y revisa que est\u00e9 conectada, encima de la l\u00e1mpara de torre',
@@ -123,6 +125,61 @@
       'Water pitchers full: 2 at Bar, 1 at Host Stand': 'Jarras de agua llenas: 2 en la barra, 1 en el puesto de anfitri\u00f3n'
     };
     var ROLE_RE = { bar: /bartend/i, host: /bus|host|runner|expo/i };
+    /* New lists from the staff review (Kassandra and Mikayla, Eric's calls, Nov 20 2026). Shown only with ?newlists in the link
+       until Eric approves them for the crew. */
+    var HL = function (x) { return x; }, WD = function (x) { return x; };   /* set to hostLayout and word once the board is up */
+    var NEWL = /[?&]newlists\b/.test(location.search);
+    /* Opening set-up goes to whoever opens first, by the schedule: the bartender when the busser starts later (or there is no
+       busser), the busser when they start together or the busser is in first. */
+    var FIRST_IN = ['host_open_0_6', 'host_open_0_1', 'host_open_9_0', 'host_open_0_5', 'host_open_0_8', 'host_open_0_3', 'host_open_0_12', 'host_open_0_13', 'host_open_0_2', 'host_open_2_4', 'host_open_1_3', 'bar_open_0_0'];
+    var SHARE_MID = ['host_mid_0_0', 'host_mid_0_1', 'host_mid_0_2', 'host_mid_0_3', 'host_mid_1_2', 'host_mid_3_1'];
+    var TO_BAR_CLOSE = ['host_close_0_15', 'host_close_0_18'], OFF_HOST_CLOSE = ['host_close_0_15', 'host_close_0_18', 'host_close_0_19', 'host_close_0_20'];
+    var DISH = 'Clear dishes and place them on the cart (the kitchen washes them)';
+    var RETXT = { host_mid_3_1: DISH, host_amoff_0_10: DISH, bar_close_4_1: 'Bar lights, TVs/A-V and music off' };
+    function opener(d) {
+      var two = amDay(d), sh = vic(d).filter(function (w) { return !two || mins(w.start) < AM_BEFORE; });
+      var first = function (re) { return sh.filter(function (w) { return re.test(w.role || ''); }).sort(function (a, b) { return mins(a.start) - mins(b.start); })[0] || null; };
+      var b = first(ROLE_RE.bar), h = first(/bus|host|runner/i);
+      if (!b && !h) return null;
+      return { who: b && (!h || mins(b.start) < mins(h.start)) ? 'bar' : 'host', b: b, h: h };
+    }
+    function retext(i) { return RETXT[i[0]] ? [i[0], WD(RETXT[i[0]])].concat(i.slice(2)) : i; }
+    function newLists(key, d, out, s0) {
+      var two = amDay(d), pool = {};
+      var grab = function (k) { (k === 'host_open' ? HL(s0(k, d)) : s0(k, d)).forEach(function (s) { s[1].forEach(function (i) { pool[i[0]] = i; }); }); };
+      var pick = function (ids) { return ids.map(function (id) { return pool[id]; }).filter(Boolean).map(retext); };
+      var strip = function (ids) { return out.map(function (s) { return [s[0], s[1].filter(function (i) { return ids.indexOf(i[0]) < 0; })].concat(s.slice(2)); }).filter(function (s) { return s[1].length; }); };
+      out = out.map(function (s) { return [s[0], s[1].map(retext)].concat(s.slice(2)); });
+      if (key === 'host_open' || key === 'bar_open') {
+        grab('host_open'); grab('bar_open');
+        var op = opener(d), mine = op && op.who === (key === 'bar_open' ? 'bar' : 'host');
+        var ids = FIRST_IN.filter(function (id) { return !(two && EVE_IDS.indexOf(id) >= 0); });
+        out = strip(FIRST_IN.concat(key === 'host_open' ? ['host_open_2_1'] : []));
+        if (key === 'bar_open') { var bd = out.filter(function (s) { return s[1].some(function (i) { return /^bar_open_3_/.test(i[0]); }); })[0]; var w = pick(['host_open_2_1']); if (bd) bd[1] = bd[1].concat(w); else out.push([WD('Before doors open'), w]); }
+        if (mine || !op && key === 'host_open') out.unshift([WD('Opening set-up'), pick(ids)]);
+        return out;
+      }
+      if (key === 'bar_mid') { grab('host_mid'); out.push([WD('Floor and restock, shared with the busser'), pick(SHARE_MID)]); return out; }
+      if (key === 'bar_amoff') { grab('host_amoff'); out.push([WD('Shared with the busser'), pick(['host_amoff_0_10'])]); return out; }
+      if (key === 'host_close') return strip(OFF_HOST_CLOSE);
+      if (key === 'bar_close') { grab('host_close'); var fw = out.filter(function (s) { return s[1].some(function (i) { return /^bar_close_4_/.test(i[0]); }); })[0]; var m = pick(TO_BAR_CLOSE); if (fw) fw[1] = fw[1].concat(m); else out.push([WD('From the floor list'), m]); return out; }
+      return out;
+    }
+    /* The note under the open lists that says who has the opening set-up today and why. */
+    function openerNote(key, d) {
+      var op = opener(d); if (!op) return '';
+      var fn = function (w) { return w ? first(w.name) : ''; }, at = function (w) { return w ? String(w.start).replace(':00', '') : ''; };
+      var bar = key === 'bar_open';
+      if (op.who === 'bar') {
+        if (!op.h) return bar ? tt('No busser on the schedule, so the opening set-up is yours.', 'No hay busser en el horario; la preparaci\u00f3n de apertura es tuya.') : tt('No busser on the schedule; the bartender has the opening set-up.', 'No hay busser en el horario; el bartender hace la preparaci\u00f3n de apertura.');
+        return bar ? tt('Opening set-up moved to you: ' + fn(op.h) + ' (busser) starts at ' + at(op.h) + ', after you (' + at(op.b) + ').', 'La preparaci\u00f3n de apertura pas\u00f3 a ti: ' + fn(op.h) + ' (busser) entra a las ' + at(op.h) + ', despu\u00e9s de ti (' + at(op.b) + ').')
+          : tt('Opening set-up is on the bartender\u2019s list today: ' + fn(op.b) + ' starts at ' + at(op.b) + ', before you (' + at(op.h) + ').', 'La preparaci\u00f3n de apertura est\u00e1 en la lista del bartender hoy: ' + fn(op.b) + ' entra a las ' + at(op.b) + ', antes que t\u00fa (' + at(op.h) + ').');
+      }
+      if (!op.b) return bar ? '' : tt('Opening set-up is yours today.', 'La preparaci\u00f3n de apertura es tuya hoy.');
+      var same = mins(op.b.start) === mins(op.h.start);
+      return bar ? tt('Opening set-up is on the busser\u2019s list today: ' + fn(op.h) + (same ? ' starts with you at ' + at(op.h) + '.' : ' starts at ' + at(op.h) + ', before you.'), 'La preparaci\u00f3n de apertura est\u00e1 en la lista del busser hoy: ' + fn(op.h) + (same ? ' entra contigo a las ' + at(op.h) + '.' : ' entra a las ' + at(op.h) + ', antes que t\u00fa.'))
+        : tt('Opening set-up is yours today: ' + (same ? 'you and ' + fn(op.b) + ' both start at ' + at(op.h) + '.' : 'you start at ' + at(op.h) + ', before ' + fn(op.b) + ' (' + at(op.b) + ').'), 'La preparaci\u00f3n de apertura es tuya hoy: ' + (same ? 't\u00fa y ' + fn(op.b) + ' entran a las ' + at(op.h) + '.' : 'entras a las ' + at(op.h) + ', antes que ' + fn(op.b) + ' (' + at(op.b) + ').'));
+    }
     /* Who works each role, AM (starts before 3 PM) or PM, from the schedule. */
     function crew(d, r, am) { return vic(d).filter(function (w) { return ROLE_RE[r].test(w.role || '') && (mins(w.start) < AM_BEFORE) === am; }).map(function (w) { return w.name; }); }
     function names(d, r, am) { var n = crew(d, r, am).map(function (x) { return first(x); }); return n.length ? ' \u00b7 ' + n.join(', ') : ''; }
@@ -147,6 +204,7 @@
         secs.forEach(function (s) { var rest = s[1].filter(function (i) { return !used[i[0]]; }); if (rest.length) out.push([s[0], rest].concat(s.slice(2))); });
         return out;
       }
+      HL = hostLayout; WD = word;
       var expoSecs = function (d) { return s0('expo_svc', d); };
       sections = function (key, d) {
         if (NEW[key] && !amDay(d)) return [];
@@ -154,6 +212,7 @@
         if (key === 'expo_svc' && two) return [];
         var out = s0(key, d);
         if (key === 'host_open') out = hostLayout(out);
+        if (NEWL) out = newLists(key, d, out, s0);
         if (!two) return out;
         if (key === 'host_open') out = out.map(function (s) { return [s[0], s[1].filter(function (i) { return EVE_IDS.indexOf(i[0]) < 0; })].concat(s.slice(2)); }).filter(function (s) { return s[1].length; });
         /* Expo on a two-shift day: the window set-up goes on the AM busser's open, service on the PM evening check, the rest on the close. */
@@ -210,6 +269,11 @@
       function word(x) { return es() && SP[x] ? SP[x] : x; }
       function decorate() {
         var d = ui.date || iso(new Date()), done = (S.shift && S.shift.done) || {}, secs = sections('host_open', d);
+        if (NEWL) document.querySelectorAll('#view details[data-fold^="host_open_"], #view details[data-fold^="bar_open_"]').forEach(function (card) {
+          if (card.querySelector('.x-finote')) return;
+          var n = openerNote(/^bar_open_/.test(card.dataset.fold) ? 'bar_open' : 'host_open', d); if (!n) return;
+          var sum = card.querySelector('summary'); if (sum) sum.insertAdjacentHTML('afterend', '<p class="x-finote">' + hx(n) + '</p>');
+        });
         hostCards().forEach(function (card) {
           if (card.querySelector('.x-hsec')) return;
           var body = card, kids = Array.prototype.slice.call(card.children), si = -1, box = null;
@@ -250,6 +314,7 @@
       style('.x-hsec{border:2px solid var(--cherry,#8B1E1E);border-radius:12px;padding:6px 12px 10px;margin:10px 0}.x-hsec.ok{border-color:var(--line,#ccc);opacity:.85}.x-hsec .grp{margin-top:4px;display:flex;align-items:center;gap:10px}' +
         '.x-hcur{display:block;color:var(--cherry,#8B1E1E);font:700 15px/1.3 system-ui,-apple-system,sans-serif;margin-top:3px;text-transform:none;letter-spacing:0}' +
         '.x-all{margin-left:auto;min-height:36px;padding:4px 12px;border-radius:999px;border:1.5px solid var(--cherry,#8B1E1E);background:transparent;color:var(--cherry,#8B1E1E);font:700 13px system-ui,-apple-system,sans-serif;cursor:pointer;white-space:nowrap}' +
+        '.x-finote{margin:6px 2px 8px;padding:8px 12px;border-left:4px solid #1F6FEB;background:rgba(31,111,235,.08);border-radius:8px;font-size:14px;line-height:1.4;color:var(--ink,#18181B)}' +
         '.x-all.armed,.x-all:active{background:var(--cherry,#8B1E1E);color:#fff}summary .cardhead{flex-wrap:wrap}.x-hnote{margin:6px 2px 2px;color:var(--muted,#666);font-size:14px;font-style:italic}');
       var r0 = render;
       render = function () { r0.apply(this, arguments); try { decorate(); } catch (err) {} };
@@ -273,10 +338,17 @@
   var RSP = { 'Line wiped down and sanitized': 'L\u00ednea limpia y sanitizada', 'Line restocked from the walk-in for the evening': 'L\u00ednea surtida del walk-in para la noche',
     'Everything open covered, labeled, and dated': 'Todo lo abierto tapado, etiquetado y con fecha', 'Prep levels checked; anything low started or written down for 5 PM': 'Niveles de prep revisados; lo que est\u00e9 bajo, empezarlo o anotarlo para las 5 PM',
     'Fryer oil skimmed and checked': 'Aceite de la freidora limpio y revisado', 'Dishes run and the dish area clear': 'Platos lavados y el \u00e1rea de lavado libre', 'Floor swept; trash out if it is over half full': 'Piso barrido; basura afuera si est\u00e1 a m\u00e1s de la mitad',
-    'Afternoon reset, before the 4 PM break': 'Reinicio de la tarde, antes del descanso de las 4 PM' };
+    'Afternoon reset, before the 4 PM break': 'Reinicio de la tarde, antes del descanso de las 4 PM', 'Dishes': 'Platos',
+    'Wash the dishes from the cart (the floor and bar clear them onto it)': 'Lava los platos del carrito (el piso y la barra los ponen ah\u00ed)' };
   function kready() { return typeof render === 'function' && typeof S !== 'undefined' && typeof ui !== 'undefined' && typeof shiftsOn === 'function' && typeof mins === 'function' && typeof fold === 'function' && typeof checklist === 'function' && typeof progress === 'function' && typeof iso === 'function'; }
   function kword(x) { return es() && RSP[x] ? RSP[x] : x; }
+  var KNEWL = /[?&]newlists\b/.test(location.search);
   function kdecorate() {
+    var mid0 = document.querySelector('#view details[data-fold="midlist"]');
+    if (KNEWL && mid0 && !document.querySelector('#view details[data-fold="dishlist"]')) {
+      var dd = ui.date || iso(new Date()), dn = (S.shift && S.shift.done) || {}, it = [['kd_0', kword('Wash the dishes from the cart (the floor and bar clear them onto it)')]], cc = dn.kd_0 ? 1 : 0;
+      mid0.insertAdjacentHTML('afterend', fold('dishlist', hx(kword('Dishes')), cc + ' of 1', checklist('shifts/' + dd, it, dn), cc ? ' done' : ' edge'));
+    }
     var mid = document.querySelector('#view details[data-fold="midlist"]');
     if (!mid || document.querySelector('#view details[data-fold="resetlist"]')) return;
     var d = ui.date || iso(new Date());
