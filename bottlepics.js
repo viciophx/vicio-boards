@@ -5,7 +5,8 @@
    bottle's profile, and the photo shows at the top of the profile too. Wine, beer and the house batches have no photo.
    Soda BIBs & CO2 (Eric): each bag-in-box line shows its brand's logo next to the name, loaded by link the same way. Logos
    are in for Coke, Sprite, Coke Zero, Dr Pepper, Lemonade (Minute Maid), Cranberry (Ocean Spray) and Tonic (Schweppes);
-   the energy drink waits for Eric to say which brand it is.
+   the energy drink waits for Eric to say which brand it is. Colette's Board can't load outside pictures, so it carries
+   small copies of the logos itself (window.__VICIO_LOGOS), which this file uses when they are there.
    Beer cooler (Eric): each beer line shows a photo of the bottle or can, loaded by link the same way. Sonora Negra and
    Sonora Clara have none yet (no clean photo found). */
 (function () {
@@ -99,7 +100,8 @@
     Array.prototype.forEach.call(sec.querySelectorAll('[data-lvid],input[data-inv]'), function (el) {
       var id = el.dataset.lvid || el.dataset.inv, row = el.closest('tr'); if (!LOGOS[id] || !row || row.querySelector('.x-blogo')) return;
       var cell = row.cells[0]; if (!cell) return;
-      cell.insertAdjacentHTML('afterbegin', '<img class="x-blogo" src="https://' + LOGOS[id] + '" alt="" referrerpolicy="no-referrer" onerror="this.remove()">');
+      var src = (window.__VICIO_LOGOS || {})[id] || 'https://' + LOGOS[id];
+      cell.insertAdjacentHTML('afterbegin', '<img class="x-blogo" src="' + src + '" alt="" referrerpolicy="no-referrer" onerror="this.remove()">');
     });
   }
   function pics() {
