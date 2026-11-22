@@ -18,14 +18,19 @@
    Batches (Eric): a house batch counted under half shows Make more, is listed at the top, and links to the drink's spec
    where there is one.
    Par is red and locked (Eric): on the iPads the par under each name is a red number with a small lock and nobody can
-   change it there; managers change pars on Colette's Board, where the box stays editable. */
+   change it there; managers change pars on Colette's Board, where the box stays editable.
+   Managers can change pars on the iPad too (Eric): signed in as a manager, the par is a red box they can type in; everyone
+   else sees the red number with the lock.
+   Real del Valle (Eric): the speed rail line is spelled as on the bottle. Its old id (real_de_valle_blanco) carries over:
+   last week's number and this week's count show on the new line, and its par of 2 is copied once (flag rdv1121).
+   House batches are a level (Eric): 100%, 75%, 50%, 25% or Make, one tap, instead of the bottle. */
 (function () {
   if (window.__vicioBarCount || window.VICIO_BOARD !== 'foh') return;
   window.__vicioBarCount = true;
   var NEW = [
     ['Top shelf', ['Jack Daniel\u2019s', 'Jameson', 'Crown Royal', 'Johnnie Walker Black', 'Campari', 'Aperol', 'Camazotz Oaxacan Rum', 'Belvedere', 'The Botanist Gin', 'G4 Blanco', 'G4 Reposado', 'Terralta Blanco', 'Tequila Ocho Plata', 'Ver\u00e1s', 'Amar\u00e1s', 'Sotol La Higuera']],
     ['Shelf 2', ['Bulleit 95 Rye', 'Bulleit Bourbon', 'Wild Turkey 101 Rye', 'Hennessy', 'Maker\u2019s Mark', 'Captain Morgan', 'Johnnie Walker Red', 'Fireball', 'Nikka', 'Uruapan Charanda Blanco', 'Tanqueray', 'Hibiki', 'Riablo Sotol Spiced Pineapple', 'Lost Lore Blanco', 'Suerte Reposado', 'Casamigos Reposado', '1800 Blanco', 'Jose Cuervo Gold', 'Jose Cuervo Silver']],
-    ['Speed rail, top', ['Chipotle tequila (batch)', 'Green Tea (batch)', 'Vegas Bomb (batch)', 'Nolet\u2019s Silver', 'Evan Williams', 'Tito\u2019s', 'Rayu Joven', 'Real de Valle Blanco', 'La Vieja Taberna', 'Tequila mix (batch)']],
+    ['Speed rail, top', ['Chipotle tequila (batch)', 'Green Tea (batch)', 'Vegas Bomb (batch)', 'Nolet\u2019s Silver', 'Evan Williams', 'Tito\u2019s', 'Rayu Joven', 'Real del Valle Blanco', 'La Vieja Taberna', 'Tequila mix (batch)']],
     ['Speed rail, bottom', ['De Kuyper Watermelon', 'De Kuyper Blue Cura\u00e7ao', 'De Kuyper Peachtree', 'Agavales Spicy Tamarindo', 'Potter\u2019s Triple Sec', 'Malibu', 'Bacardi', 'Guava Goddess (batch)', 'Mexican Candy (batch)']]];
   function apply() {
     if (typeof BARINV === 'undefined' || typeof INVITEMS === 'undefined' || typeof slug !== 'function') return false;
@@ -73,6 +78,39 @@
     });
   }
   var IN_COLETTE = false; try { IN_COLETTE = !!(window.parent && window.parent !== window); } catch (e) { IN_COLETTE = true; }
+  var OLD_RDV = 'real_de_valle_blanco', NEW_RDV = 'real_del_valle_blanco';
+  function aliasRdv() {
+    [S.prevInv, S.inv].forEach(function (o) { if (o && o.c && o.c[OLD_RDV] != null && o.c[NEW_RDV] == null) o.c[NEW_RDV] = o.c[OLD_RDV]; });
+    var cfg = S.barcfg || {}, par = cfg.par || {};
+    if (!cfg.rdv1121 && !aliasRdv.saved && cfg.par1121 && typeof save === 'function') {
+      aliasRdv.saved = true; var at = Date.now(), p = {}; p[NEW_RDV] = par[OLD_RDV] != null ? par[OLD_RDV] : 2;
+      S.barcfg = Object.assign({}, cfg, { par: Object.assign({}, par, p), rdv1121: at }); save('config/bar', { par: p, rdv1121: at });
+    }
+  }
+  var LV = [[1, '100%'], [0.75, '75%'], [0.5, '50%'], [0.25, '25%'], [0, 'Make']];
+  function lvIcon(v) {
+    if (v === 0) return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+    var h = 16 * v; return '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="6" y="3.5" width="12" height="17" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="7.6" y="' + (20 - h).toFixed(1) + '" width="8.8" height="' + h.toFixed(1) + '" rx="1" fill="currentColor"/></svg>';
+  }
+  function batchLevels() {
+    var sec = document.querySelector('[data-fold="sec_bar"]'); if (!sec) return;
+    var c = (S.inv && S.inv.c) || {};
+    INVITEMS.forEach(function (it) {
+      if (!/\(batch\)/i.test(it[1])) return;
+      var b = sec.querySelector('[data-tcid="' + it[0] + '"]'); if (!b) return;
+      var cell = b.closest('td'), v = c[it[0]];
+      cell.innerHTML = '<div class="x-blv" role="group" aria-label="Batch level">' + LV.map(function (l) {
+        return '<button type="button" class="x-blb' + (l[0] === 0 ? ' make' : '') + (v != null && v !== '' && +v === l[0] ? ' on' : '') + '" data-blv="' + l[0] + '" data-blid="' + it[0] + '" aria-label="' + l[1] + '">' + lvIcon(l[0]) + '<small>' + l[1] + '</small></button>';
+      }).join('') + '</div>';
+      var row = cell.closest('tr'), lc = row && row.cells[1]; if (lc && /^[\d.]+$/.test(lc.textContent.trim())) { var pv = +lc.textContent.trim(), x = LV.filter(function (l) { return l[0] === pv; })[0]; if (x) lc.textContent = x[1]; }
+    });
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-blid]'); if (!b) return;
+    e.preventDefault(); e.stopPropagation();
+    var id = b.dataset.blid, v = +b.dataset.blv, cur = (S.inv && S.inv.c || {})[id];
+    setVal(id, cur != null && +cur === v ? null : v);
+  }, true);
   function relayout() {
     var sec = document.querySelector('[data-fold="sec_bar"]'); if (!sec) return;
     Array.prototype.forEach.call(sec.querySelectorAll('[data-fold^="inv_"] table'), function (t) {
@@ -85,8 +123,9 @@
         var pw = document.createElement('div'); pw.className = 'x-par'; pw.innerHTML = '<span>Par</span>';
         while (par.firstChild) pw.appendChild(par.firstChild);
         var inp = pw.querySelector('input');
-        if (inp && !IN_COLETTE) { var tx = document.createElement('b'); tx.textContent = inp.value === '' ? '\u2013' : inp.value; inp.replaceWith(tx); }
-        pw.insertAdjacentHTML('beforeend', IN_COLETTE && inp ? '' : '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>');
+        var isMgr = false; try { isMgr = typeof MGR !== 'undefined' && !!MGR; } catch (e) {}
+        if (inp && !IN_COLETTE && !isMgr) { var tx = document.createElement('b'); tx.textContent = inp.value === '' ? '\u2013' : inp.value; inp.replaceWith(tx); }
+        pw.insertAdjacentHTML('beforeend', (IN_COLETTE || isMgr) && inp ? '' : '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>');
         name.appendChild(pw); par.remove();
         r.insertBefore(cnt, last); cnt.classList.add('x-cnt');
       });
@@ -99,7 +138,7 @@
     var c = (S.inv && S.inv.c) || {}, pv = (S.prevInv && S.prevInv.c) || {}, ok = (S.inv && S.inv.ok) || {}, re = [], mk = [];
     INVITEMS.forEach(function (it) {
       var id = it[0], name = it[1], grp = it[2] || ''; if (/beer/i.test(grp)) return;
-      var v = c[id], row = sec.querySelector('[data-tcid="' + id + '"]'); row = row && row.closest('tr');
+      var v = c[id], row = sec.querySelector('[data-tcid="' + id + '"],[data-blid="' + id + '"]'); row = row && row.closest('tr');
       if (v == null || v === '' || isNaN(+v)) return; v = +v;
       var cell = row && row.cells[0], html = '';
       if (/\(batch\)/i.test(name)) {
@@ -154,7 +193,7 @@
     } else if (S.barcfg && Object.keys(S.barcfg).length) go(S.barcfg);
   }
   function setVal(id, v) {
-    if (v != null) v = Math.round(v * 10) / 10;
+    if (v != null) v = Math.round(v * 100) / 100;
     S.inv = Object.assign({}, S.inv, { c: Object.assign({}, (S.inv || {}).c, (function () { var o = {}; o[id] = v; return o; })()) });
     var patch = { c: {} }; patch.c[id] = v; save('barinv/' + ui.week, patch); render();
   }
@@ -186,12 +225,12 @@
     '.x-tcs{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:92px}.x-tcv{font:700 24px/1 system-ui,-apple-system,sans-serif}.x-tcl{font:600 10px system-ui,-apple-system,sans-serif;color:var(--muted,#A1A1AA);text-transform:uppercase;letter-spacing:.04em}' +
     '.x-tcf{display:flex;align-items:center;gap:6px}.x-tcf .btn{min-width:36px;min-height:36px;padding:0;font-size:18px}.x-tcf b{min-width:16px;text-align:center}.x-tc0{min-height:30px;padding:2px 8px;font-size:12px}.x-tc0.on{background:var(--cherry,#8B1E1E);border-color:var(--cherry,#8B1E1E);color:#fff}' +
     '.x-par{display:flex;align-items:center;gap:6px;margin-top:6px;font:600 11px system-ui,-apple-system,sans-serif;color:var(--muted,#A1A1AA);text-transform:uppercase;letter-spacing:.04em}.x-par input{width:64px;min-height:34px;color:var(--cherry,#E5484D)}.x-par,.x-par b{color:var(--cherry,#E5484D)}.x-par b{font-size:16px}.x-par svg{flex:none}' +
-    '[data-fold="sec_bar"] td.x-cnt{text-align:left}[data-fold="sec_bar"] .x-tc{justify-content:flex-start}.x-flag{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px}.x-fbtn{min-height:30px;padding:2px 10px;font-size:12px}.x-fnote{font-size:12px;color:var(--muted,#A1A1AA)}.x-need{margin:4px 0 8px;font-weight:600}'; document.head.appendChild(st); })();
+    '[data-fold="sec_bar"] td.x-cnt{text-align:left}[data-fold="sec_bar"] .x-tc{justify-content:flex-start}.x-flag{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px}.x-fbtn{min-height:30px;padding:2px 10px;font-size:12px}.x-fnote{font-size:12px;color:var(--muted,#A1A1AA)}.x-need{margin:4px 0 8px;font-weight:600}.x-blv{display:flex;flex-wrap:wrap;gap:5px}.x-blb{display:inline-flex;flex-direction:column;align-items:center;gap:1px;min-height:48px;min-width:50px;padding:4px 6px;border-radius:9px;border:1px solid var(--line,#2E2E34);background:var(--bg,#000);color:var(--ink,#EDEDF0);cursor:pointer}.x-blb small{font:600 10px/1 system-ui,-apple-system,sans-serif}.x-blb.on{background:var(--good,#1F7A4D);border-color:var(--good,#1F7A4D);color:#fff}.x-blb.make{color:var(--cherry,#E5484D)}.x-blb.make.on{background:var(--cherry,#8B1E1E);border-color:var(--cherry,#8B1E1E);color:#fff}'; document.head.appendChild(st); })();
 
   (function start() {
     if (!apply() || typeof render !== 'function') return setTimeout(start, 200);
     setTimeout(function () { try { setPars(); } catch (e) {} }, 4000);
-    var r0 = render; render = function () { var out = r0.apply(this, arguments); try { tapCount(); } catch (e) {} try { relayout(); } catch (e) {} try { checks(); } catch (e) {} return out; };
+    var r0 = render; render = function () { try { aliasRdv(); } catch (e) {} var out = r0.apply(this, arguments); try { tapCount(); } catch (e) {} try { batchLevels(); } catch (e) {} try { relayout(); } catch (e) {} try { checks(); } catch (e) {} return out; };
     render();
   })();
 })();
