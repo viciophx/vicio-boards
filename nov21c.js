@@ -5,7 +5,8 @@
       seating/layout_before_1121d.
    3. Attic inventory count: the one "Folding to-go boxes" line is now the three boxes Vicio carries: pizza boxes, large
       to-go boxes and small to-go boxes.
-   4. Beer cooler count: Negra Modelo removed (Eric). Counts already saved for it stay in the record. */
+   4. Beer cooler count: Negra Modelo removed (Eric). Counts already saved for it stay in the record.
+   5. Mango Cart removed (Eric): from the bar inventory count, the beer list on the Drinks page, and the beer quiz. */
 (function () {
   if (window.__vicioNov21c || window.VICIO_BOARD !== 'foh') return;
   window.__vicioNov21c = true;
@@ -63,6 +64,19 @@
       COUNTFORMS.forEach(function (f) { (f.groups || []).forEach(function (g) {
         var i = g[1].findIndex(function (it) { return it[0] === 'b_negramodelo'; }); if (i >= 0) { g[1].splice(i, 1); dropItems.done = true; }
       }); });
+    } catch (e) {}
+    try {
+      if (dropItems.mango) return;
+      var isM = function (n) { return /mango cart/i.test(String(n || '')); }, hit = false;
+      if (typeof BARINV !== 'undefined') BARINV.forEach(function (g) { for (var i = g[1].length - 1; i >= 0; i--) if (isM(g[1][i])) { g[1].splice(i, 1); hit = true; } });
+      if (typeof INVITEMS !== 'undefined') for (var j = INVITEMS.length - 1; j >= 0; j--) if (isM(INVITEMS[j][1])) { INVITEMS.splice(j, 1); hit = true; }
+      if (typeof BARMENU !== 'undefined') BARMENU.forEach(function (g) { var l = g[2]; if (Array.isArray(l)) for (var k = l.length - 1; k >= 0; k--) if (isM(l[k][0])) { l.splice(k, 1); hit = true; } });
+      if (typeof QUIZZES !== 'undefined' && QUIZZES.beer && Array.isArray(QUIZZES.beer.q)) {
+        QUIZZES.beer.q = QUIZZES.beer.q.filter(function (q) { return !isM(q[0]) && !isM(q[1]); });
+        QUIZZES.beer.q.forEach(function (q) { if (Array.isArray(q[2])) q[2] = q[2].map(function (w) { return isM(w) ? 'Corona' : w; }); });
+        hit = true;
+      }
+      dropItems.mango = hit;
     } catch (e) {}
   }
   (function start() {
