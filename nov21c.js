@@ -14,7 +14,9 @@
    8. Inventory: Soda BIBs & CO2 is its own section, right after the Attic count, instead of a group inside it (Eric).
       Counts are saved by item, so nothing already counted is lost; it has its own Submit. The bag-in-box sodas Vicio carries:
       Coke, Sprite, Dr Pepper, Energy drink, Lemonade, Coke Zero, Cranberry and Tonic (Eric). Bottled Canada Dry Tonic
-      Water stays on the N/A count. */
+      Water stays on the N/A count.
+   9. Soda BIBs & CO2 is rated, not counted (Eric): each line is 100%, 75%, 50%, 25% or Need to order, one tap. Saved as
+      1, 0.75, 0.5, 0.25 or 0 in the same place a count goes, and anything on Need to order is listed at the top. */
 (function () {
   if (window.__vicioNov21c || window.VICIO_BOARD !== 'foh') return;
   window.__vicioNov21c = true;
@@ -119,11 +121,42 @@
       dropItems.na2 = true;
     } catch (e) {}
   }
+  var LV = [[1, '100%'], [0.75, '75%'], [0.5, '50%'], [0.25, '25%'], [0, 'Need to order']];
+  function lvLabel(v) { var x = LV.find(function (l) { return l[0] === +v; }); return x ? x[1] : (v == null || v === '' ? '' : String(v)); }
+  function bibLevels() {
+    var sec = document.querySelector('[data-fold="sec_inv_bib"]'); if (!sec || sec.dataset.lv) return;
+    sec.dataset.lv = '1';
+    var c = (S.inv && S.inv.c) || {}, need = [];
+    A.forEach.call(sec.querySelectorAll('input[data-inv]'), function (inp) {
+      var id = inp.dataset.inv, v = c[id], cell = inp.closest('td'), row = inp.closest('tr');
+      if (v === 0) need.push((row && row.cells[0] ? row.cells[0].textContent : id).replace(/^Bag-in-box:\s*/, '').replace(/Lift to judge partials/, '').trim());
+      cell.innerHTML = '<div class="x-lv" role="group" aria-label="Level">' + LV.map(function (l) {
+        return '<button type="button" class="x-lvb' + (l[0] === 0 ? ' need' : '') + (v != null && v !== '' && +v === l[0] ? ' on' : '') + '" data-lv="' + l[0] + '" data-lvid="' + id + '">' + l[1] + '</button>';
+      }).join('') + '</div>';
+      if (row && row.cells[2] && /^[\d.]+$/.test(row.cells[2].textContent.trim())) row.cells[2].textContent = lvLabel(row.cells[2].textContent.trim());
+    });
+    A.forEach.call(sec.querySelectorAll('thead th'), function (th) { if (th.textContent.trim() === 'Count') th.textContent = 'Level'; });
+    var p = sec.querySelector('p.muted'); if (p) p.textContent = 'Tap the level of each bag-in-box and the CO2: 100%, 75%, 50%, 25%, or Need to order.';
+    if (need.length && p) p.insertAdjacentHTML('afterend', '<p class="x-need"><span class="pill warn">Need to order</span> ' + need.join(', ') + '</p>');
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-lvid]'); if (!b) return;
+    e.preventDefault(); e.stopPropagation();
+    var id = b.dataset.lvid, v = +b.dataset.lv, cur = S.inv && S.inv.c ? S.inv.c[id] : undefined;
+    if (cur != null && +cur === v) v = null;   /* tap the lit one again to clear it */
+    S.inv = Object.assign({}, S.inv, { c: Object.assign({}, (S.inv || {}).c, (function () { var o = {}; o[id] = v; return o; })()) });
+    var patch = { c: {} }; patch.c[id] = v; save('barinv/' + ui.week, patch);
+    render();
+  }, true);
+  style('[data-fold="sec_inv_bib"] th:nth-child(2),[data-fold="sec_inv_bib"] td:nth-child(2){display:none}' +
+    '.x-lv{display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end}.x-lvb{min-height:40px;min-width:52px;padding:4px 9px;border-radius:9px;border:1px solid var(--line,#2E2E34);background:var(--bg,#000);color:var(--ink,#EDEDF0);font:600 14px system-ui,-apple-system,sans-serif;cursor:pointer}' +
+    '.x-lvb.on{background:var(--good,#1F7A4D);border-color:var(--good,#1F7A4D);color:#fff}.x-lvb.need.on{background:var(--cherry,#8B1E1E);border-color:var(--cherry,#8B1E1E)}.x-lvb.need{white-space:nowrap}.x-need{margin:4px 0 8px;font-weight:600}');
+
   (function start() {
     if (typeof render !== 'function' || typeof ui === 'undefined' || !document.getElementById('view')) return setTimeout(start, 200);
     togoBoxes(); dropItems(); bibForm();
     var r0 = render;
-    render = function () { var out = r0.apply(this, arguments); setTimeout(function () { try { shorter(); } catch (e) {} try { fixLayout1121d(); } catch (e) {} }, 30); return out; };
+    render = function () { var out = r0.apply(this, arguments); setTimeout(function () { try { shorter(); } catch (e) {} try { fixLayout1121d(); } catch (e) {} }, 30); try { bibLevels(); } catch (e) {} return out; };
     render();
   })();
 })();
