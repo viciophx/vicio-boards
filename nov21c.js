@@ -13,10 +13,12 @@
       Fountain Sprite (bag-in-box) stays.
    8. Inventory: Soda BIBs & CO2 is its own section, right after the Attic count, instead of a group inside it (Eric).
       Counts are saved by item, so nothing already counted is lost; it has its own Submit. The bag-in-box sodas Vicio carries:
-      Coke, Sprite, Dr Pepper, Energy drink, Lemonade, Coke Zero, Cranberry and Tonic (Eric). Bottled Canada Dry Tonic
-      Water stays on the N/A count.
+      Coke, Sprite, Dr Pepper, Energy drink, Lemonade, Coke Zero, Cranberry and Tonic (Eric).
    9. Soda BIBs & CO2 is rated, not counted (Eric): each line is 100%, 75%, 50%, 25% or Need to order, one tap. Saved as
-      1, 0.75, 0.5, 0.25 or 0 in the same place a count goes, and anything on Need to order is listed at the top. */
+      1, 0.75, 0.5, 0.25 or 0 in the same place a count goes, and anything on Need to order is listed at the top.
+      The buttons are icons: a box filled to the level, and a cart for Need to order (Eric).
+  10. Soda products come from Swire now (Eric): the BIB section says so, and the Coke line no longer says Pope Lime.
+  11. N/A count: the Sodas and energy group is gone, since sodas have their own section (Eric). Dasani added to Water. */
 (function () {
   if (window.__vicioNov21c || window.VICIO_BOARD !== 'foh') return;
   window.__vicioNov21c = true;
@@ -77,7 +79,8 @@
       var grp = at.groups.splice(gi, 1)[0];
       if (!grp[1].some(function (it) { return it[0] === 'a_bibtonic'; })) { var ci = grp[1].findIndex(function (it) { return /^a_co2/.test(it[0]); }); grp[1].splice(ci < 0 ? grp[1].length : ci, 0, ['a_bibtonic', 'Bag-in-box: Tonic', 'boxes', '']); }
       at.desc = 'Paper goods and cleaning. Soda BIBs and CO2 have their own count below. The freezer is the kitchen\'s count. Partials in tenths, 0.1 to 0.9.';
-      COUNTFORMS.splice(ai + 1, 0, { id: 'inv_bib', name: 'Soda BIBs & CO2', desc: 'Bag-in-box sodas and the CO2 tanks. Lift each box to judge partials, in tenths, 0.1 to 0.9. Count full spare CO2 tanks.', groups: [['Bag-in-box and CO2', grp[1]]] });
+      grp[1] = grp[1].map(function (it) { return it[0] === 'a_bibcoke' ? ['a_bibcoke', 'Bag-in-box: Coke', it[2], ''] : it; });
+      COUNTFORMS.splice(ai + 1, 0, { id: 'inv_bib', name: 'Soda BIBs & CO2', desc: 'Bag-in-box sodas (ordered from Swire) and the CO2.', groups: [['Bag-in-box and CO2', grp[1]]] });
       if (typeof FORMS !== 'undefined') { var fi = FORMS.findIndex(function (f) { return f[0] === 'inv_attic'; }); FORMS.splice(fi + 1, 0, ['inv_bib', 'Soda BIBs & CO2']); }
       if (typeof ES !== 'undefined') { ES['Soda BIBs & CO2'] = 'Bolsas de soda y CO2'; ES['Bag-in-box and CO2'] = 'Bolsas de soda y CO2'; ES['Bag-in-box: Tonic'] = ES['Bag-in-box: Tonic'] || 'Bolsa de soda: T\u00f3nica'; }
       bibForm.done = true;
@@ -120,8 +123,25 @@
       if (typeof BARMENU !== 'undefined') BARMENU.forEach(function (g) { var l = g[2]; if (Array.isArray(l) && /no alcohol/i.test(g[0])) for (var k = l.length - 1; k >= 0; k--) if (String(l[k][0]).trim() === 'Sprite') l.splice(k, 1); });
       dropItems.na2 = true;
     } catch (e) {}
+    try {
+      if (dropItems.na3) return;
+      if (typeof NABEV !== 'undefined') {
+        for (var g = NABEV.length - 1; g >= 0; g--) if (/^sodas/i.test(NABEV[g][0])) NABEV.splice(g, 1);
+        var w = NABEV.find(function (x) { return /^water/i.test(x[0]); }); if (w && w[1].indexOf('Dasani') < 0) w[1].push('Dasani');
+      }
+      if (typeof NAITEMS !== 'undefined') {
+        for (var n = NAITEMS.length - 1; n >= 0; n--) if (/^sodas/i.test(NAITEMS[n][2] || '')) NAITEMS.splice(n, 1);
+        if (!NAITEMS.some(function (i) { return i[1] === 'Dasani'; })) { var wi = -1; NAITEMS.forEach(function (i, k) { if (/^water/i.test(i[2] || '')) wi = k; }); var sl = typeof slug === 'function' ? slug('Dasani') : 'dasani'; NAITEMS.splice(wi < 0 ? NAITEMS.length : wi + 1, 0, [sl, 'Dasani', 'Water']); }
+      }
+      dropItems.na3 = true;
+    } catch (e) {}
   }
   var LV = [[1, '100%'], [0.75, '75%'], [0.5, '50%'], [0.25, '25%'], [0, 'Need to order']];
+  function lvIcon(v) {
+    if (v === 0) return '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 10.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.8L20 8H6"/><circle cx="9.5" cy="19" r="1.4"/><circle cx="17" cy="19" r="1.4"/></svg>';
+    var h = 16 * v, y = 20 - h;
+    return '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><rect x="6" y="3.5" width="12" height="17" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/>' + (h ? '<rect x="7.6" y="' + y.toFixed(1) + '" width="8.8" height="' + h.toFixed(1) + '" rx="1" fill="currentColor"/>' : '') + '</svg>';
+  }
   function lvLabel(v) { var x = LV.find(function (l) { return l[0] === +v; }); return x ? x[1] : (v == null || v === '' ? '' : String(v)); }
   function bibLevels() {
     var sec = document.querySelector('[data-fold="sec_inv_bib"]'); if (!sec || sec.dataset.lv) return;
@@ -131,12 +151,12 @@
       var id = inp.dataset.inv, v = c[id], cell = inp.closest('td'), row = inp.closest('tr');
       if (v === 0) need.push((row && row.cells[0] ? row.cells[0].textContent : id).replace(/^Bag-in-box:\s*/, '').replace(/Lift to judge partials/, '').trim());
       cell.innerHTML = '<div class="x-lv" role="group" aria-label="Level">' + LV.map(function (l) {
-        return '<button type="button" class="x-lvb' + (l[0] === 0 ? ' need' : '') + (v != null && v !== '' && +v === l[0] ? ' on' : '') + '" data-lv="' + l[0] + '" data-lvid="' + id + '">' + l[1] + '</button>';
+        return '<button type="button" class="x-lvb' + (l[0] === 0 ? ' need' : '') + (v != null && v !== '' && +v === l[0] ? ' on' : '') + '" data-lv="' + l[0] + '" data-lvid="' + id + '" aria-label="' + l[1] + '" title="' + l[1] + '">' + lvIcon(l[0]) + '<small>' + (l[0] === 0 ? 'Order' : l[1]) + '</small></button>';
       }).join('') + '</div>';
       if (row && row.cells[2] && /^[\d.]+$/.test(row.cells[2].textContent.trim())) row.cells[2].textContent = lvLabel(row.cells[2].textContent.trim());
     });
     A.forEach.call(sec.querySelectorAll('thead th'), function (th) { if (th.textContent.trim() === 'Count') th.textContent = 'Level'; });
-    var p = sec.querySelector('p.muted'); if (p) p.textContent = 'Tap the level of each bag-in-box and the CO2: 100%, 75%, 50%, 25%, or Need to order.';
+    var p = sec.querySelector('p.muted'); if (p) p.textContent = 'Tap the level of each bag-in-box and the CO2. Sodas are ordered from Swire.';
     if (need.length && p) p.insertAdjacentHTML('afterend', '<p class="x-need"><span class="pill warn">Need to order</span> ' + need.join(', ') + '</p>');
   }
   document.addEventListener('click', function (e) {
@@ -149,8 +169,8 @@
     render();
   }, true);
   style('[data-fold="sec_inv_bib"] th:nth-child(2),[data-fold="sec_inv_bib"] td:nth-child(2){display:none}' +
-    '.x-lv{display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end}.x-lvb{min-height:40px;min-width:52px;padding:4px 9px;border-radius:9px;border:1px solid var(--line,#2E2E34);background:var(--bg,#000);color:var(--ink,#EDEDF0);font:600 14px system-ui,-apple-system,sans-serif;cursor:pointer}' +
-    '.x-lvb.on{background:var(--good,#1F7A4D);border-color:var(--good,#1F7A4D);color:#fff}.x-lvb.need.on{background:var(--cherry,#8B1E1E);border-color:var(--cherry,#8B1E1E)}.x-lvb.need{white-space:nowrap}.x-need{margin:4px 0 8px;font-weight:600}');
+    '.x-lv{display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-end}.x-lvb{display:inline-flex;flex-direction:column;align-items:center;gap:1px;min-height:48px;min-width:52px;padding:4px 7px;border-radius:9px;border:1px solid var(--line,#2E2E34);background:var(--bg,#000);color:var(--ink,#EDEDF0);font:600 14px system-ui,-apple-system,sans-serif;cursor:pointer}' +
+    '.x-lvb.on{background:var(--good,#1F7A4D);border-color:var(--good,#1F7A4D);color:#fff}.x-lvb.need.on{background:var(--cherry,#8B1E1E);border-color:var(--cherry,#8B1E1E)}.x-lvb small{font:600 10px/1 system-ui,-apple-system,sans-serif}.x-lvb.need{color:var(--cherry,#E5484D)}.x-lvb.need.on{color:#fff}.x-need{margin:4px 0 8px;font-weight:600}');
 
   (function start() {
     if (typeof render !== 'function' || typeof ui === 'undefined' || !document.getElementById('view')) return setTimeout(start, 200);
