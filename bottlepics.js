@@ -8,6 +8,10 @@
    the energy drink waits for Eric to say which brand it is. Colette's Board can't load outside pictures, so it carries
    small copies of the logos itself (window.__VICIO_LOGOS), which this file uses when they are there. It carries the bottle
    and beer photos the same way (window.__VICIO_PICS, window.__VICIO_BEER), from the files Eric downloaded.
+   Cutouts and outlines (Eric, Nov 22): Eric's cutout photos (transparent background) and bottle outlines replace the photos
+   above. They live in the shared sheet (bottleart/<line id> = { cut, out }), put there by Colette's Board, which also
+   carries them built in (window.__VICIO_ART). This file shares them with barcount.js through window.__VICIO_ART. Beer has
+   cutouts only. The links above stay as a fallback.
    Beer cooler (Eric): each beer line shows a photo of the bottle or can, loaded by link the same way. Sonora Negra and
    Sonora Clara have none yet (no clean photo found). */
 (function () {
@@ -64,7 +68,9 @@
     wild_turkey_101_rye: 'cdn11.bigcommerce.com/s-taixn69rog/images/stencil/original/products/26549/809725/121922__62954.1637648950.jpg'
   };
   Object.keys(PICS).forEach(function (k) { PICS[k] = 'https://' + PICS[k]; });
-  function img(cls, id) { return '<img class="' + cls + '" src="' + ((window.__VICIO_PICS || {})[id] || PICS[id]) + '" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.style.visibility=\'hidden\'"' + (cls === 'x-bpic' ? ' data-binfo="' + id + '" title="About this bottle"' : '') + '>'; }
+  var ART = window.__VICIO_ART = window.__VICIO_ART || {};
+  function cut(id) { return (ART[id] || {}).cut; }
+  function img(cls, id) { return '<img class="' + cls + (cut(id) ? ' x-cut' : '') + '" src="' + (cut(id) || (window.__VICIO_PICS || {})[id] || PICS[id]) + '" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.style.visibility=\'hidden\'"' + (cls === 'x-bpic' ? ' data-binfo="' + id + '" title="About this bottle"' : '') + '>'; }
   var LOGOS = {
     a_bibcoke: 'upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Coca-Cola_logo.svg/250px-Coca-Cola_logo.svg.png',
     a_bibsprite: 'upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Sprite_2022.svg/250px-Sprite_2022.svg.png',
@@ -93,7 +99,7 @@
     Array.prototype.forEach.call(sec.querySelectorAll('input[data-inv]'), function (el) {
       var id = el.dataset.inv, row = el.closest('tr'); if (!BEER[id] || !row || row.querySelector('.x-beerpic')) return;
       var cell = row.cells[0]; if (!cell) return;
-      cell.insertAdjacentHTML('afterbegin', '<img class="x-beerpic" src="' + ((window.__VICIO_BEER || {})[id] || 'https://' + BEER[id]) + '" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.remove()">');
+      cell.insertAdjacentHTML('afterbegin', '<img class="x-beerpic' + (cut(id) ? ' x-cut' : '') + '" src="' + (cut(id) || (window.__VICIO_BEER || {})[id] || 'https://' + BEER[id]) + '" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.remove()">');
     });
   }
   function logos() {
@@ -122,13 +128,14 @@
     }, 0);
   }, true);
   var st = document.createElement('style');
-  st.textContent = '.x-bpic{height:112px;width:76px;object-fit:contain;border-radius:8px;cursor:pointer;flex:none;background:#fff;padding:3px;box-sizing:border-box}' +
-    '.x-beerpic{float:left;height:64px;width:40px;object-fit:contain;background:#fff;border-radius:6px;padding:2px;margin:0 10px 0 0}' +
+  st.textContent = '.x-bpic{height:112px;width:76px;object-fit:contain;border-radius:8px;cursor:pointer;flex:none;background:#fff;padding:3px;box-sizing:border-box}.x-bpic.x-cut{background:none;padding:0;filter:drop-shadow(0 2px 4px rgba(0,0,0,.45))}' +
+    '.x-beerpic{float:left;height:64px;width:40px;object-fit:contain;background:#fff;border-radius:6px;padding:2px;margin:0 10px 0 0}.x-beerpic.x-cut{background:none;padding:0;filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))}' +
     '.x-blogo{display:block;height:30px;width:auto;max-width:110px;object-fit:contain;background:#fff;border-radius:6px;padding:3px 6px;margin:0 0 6px}' +
-    '.x-bp-pic{float:right;height:150px;width:110px;object-fit:contain;margin:28px 0 8px 12px;border-radius:10px;background:#fff;padding:4px;box-sizing:border-box}';
+    '.x-bp-pic{float:right;height:150px;width:110px;object-fit:contain;margin:28px 0 8px 12px;border-radius:10px;background:#fff;padding:4px;box-sizing:border-box}.x-bp-pic.x-cut{background:none;padding:0}';
   document.head.appendChild(st);
   (function start() {
     if (typeof render !== 'function' || typeof ui === 'undefined' || !document.getElementById('view')) return setTimeout(start, 200);
+    try { if (typeof watchCol === 'function') watchCol('bottleart', function (o) { var n = 0; Object.keys(o || {}).forEach(function (k) { var v = o[k] || {}; if ((v.cut && /^data:image\//.test(v.cut)) || (v.out && /^data:image\//.test(v.out))) { if (!ART[k] || ART[k].cut !== v.cut || ART[k].out !== v.out) { ART[k] = { cut: v.cut, out: v.out }; n++; } } }); if (n) render(); }); } catch (e) {}
     var r0 = render; render = function () { var out = r0.apply(this, arguments); setTimeout(function () { try { pics(); } catch (e) {} try { logos(); } catch (e) {} try { beers(); } catch (e) {} }, 0); return out; };
     setTimeout(function () { try { pics(); } catch (e) {} try { logos(); } catch (e) {} try { beers(); } catch (e) {} }, 0);
   })();
