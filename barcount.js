@@ -6,7 +6,8 @@
    counted like bottles, in tenths.
    Tap to count (Eric): each liquor and wine line shows a bottle; tap where the liquid is, from .1 at the bottom to 1 at the
    top (10 points). Full backups are a + / - beside it, so the count is full backups plus the open bottle (2 backups and a
-   bottle at .6 is 2.6). Tap the same point again to clear the open bottle. None left marks it 0. Beer stays a number box. */
+   bottle at .6 is 2.6). Tap the same point again to clear the open bottle. None left marks it 0. Beer stays a number box.
+   Surfside is gone (Eric): off the bar count (the beer group is now just Beers), off the Drinks page, and out of the beer quiz. */
 (function () {
   if (window.__vicioBarCount || window.VICIO_BOARD !== 'foh') return;
   window.__vicioBarCount = true;
@@ -19,7 +20,15 @@
     if (typeof BARINV === 'undefined' || typeof INVITEMS === 'undefined' || typeof slug !== 'function') return false;
     if (apply.done) return true;
     var keep = BARINV.filter(function (g) { return !/^(liquor|liqueurs)$/i.test(g[0]) && !NEW.some(function (n) { return n[0] === g[0]; }); });
+    keep = keep.map(function (g) { return /beer/i.test(g[0]) ? ['Beers', g[1].filter(function (n) { return !/surfside/i.test(n); })] : g; });
     BARINV.length = 0; NEW.concat(keep).forEach(function (g) { BARINV.push(g); });
+    try {
+      if (typeof BARMENU !== 'undefined') for (var m = BARMENU.length - 1; m >= 0; m--) if (/seltzer/i.test(BARMENU[m][0]) || /surfside/i.test(BARMENU[m][1] || '')) BARMENU.splice(m, 1);
+      if (typeof QUIZZES !== 'undefined' && QUIZZES.beer) {
+        QUIZZES.beer.q = QUIZZES.beer.q.filter(function (q) { return !/surfside/i.test(JSON.stringify(q)); });
+        QUIZZES.beer.name = 'Beer and N/A'; QUIZZES.beer.sub = 'Beer prices and every N/A drink.';
+      }
+    } catch (e) {}
     INVITEMS.length = 0;
     BARINV.forEach(function (g) { g[1].forEach(function (n) { INVITEMS.push([slug(n), n, g[0]]); }); });
     apply.done = true; return true;
