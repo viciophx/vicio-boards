@@ -23,3 +23,5 @@ try { var bb = document.createElement('script'); bb.src = 'bib.js?v=' + Date.now
 try { var bh = document.createElement('script'); bh.src = 'bohinv.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(bh); } catch (e) {}
 /* Bar and N/A orders in whole bottles, batches left off (orderwhole.js, Nov 22 2026). FOH only. */
 try { var ow = document.createElement('script'); ow.src = 'orderwhole.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(ow); } catch (e) {}
+/* Count the bar by voice (voicecount.js, Nov 22 2026). FOH only. */
+try { var vc = document.createElement('script'); vc.src = 'voicecount.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(vc); } catch (e) {}
