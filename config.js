@@ -9,3 +9,5 @@ try { var ri = document.createElement('script'); ri.src = 'runicons.js?v=' + Dat
 try { var n21c = document.createElement('script'); n21c.src = 'nov21c.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(n21c); } catch (e) {}
 /* The new bar count (barcount.js, Nov 21 2026): top shelf, shelf 2 and the speed rail, in shelf order. FOH only. */
 try { var bc = document.createElement('script'); bc.src = 'barcount.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(bc); } catch (e) {}
+/* Kitchen pars locked on the iPads (parlock.js, Nov 21 2026): only Colette's Board can change them. Kitchen only. */
+try { var pl = document.createElement('script'); pl.src = 'parlock.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(pl); } catch (e) {}
