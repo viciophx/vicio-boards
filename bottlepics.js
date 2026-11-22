@@ -6,7 +6,8 @@
    Soda BIBs & CO2 (Eric): each bag-in-box line shows its brand's logo next to the name, loaded by link the same way. Logos
    are in for Coke, Sprite, Coke Zero, Dr Pepper, Lemonade (Minute Maid), Cranberry (Ocean Spray) and Tonic (Schweppes);
    the energy drink waits for Eric to say which brand it is. Colette's Board can't load outside pictures, so it carries
-   small copies of the logos itself (window.__VICIO_LOGOS), which this file uses when they are there.
+   small copies of the logos itself (window.__VICIO_LOGOS), which this file uses when they are there. It carries the bottle
+   and beer photos the same way (window.__VICIO_PICS, window.__VICIO_BEER), from the files Eric downloaded.
    Beer cooler (Eric): each beer line shows a photo of the bottle or can, loaded by link the same way. Sonora Negra and
    Sonora Clara have none yet (no clean photo found). */
 (function () {
@@ -63,7 +64,7 @@
     wild_turkey_101_rye: 'cdn11.bigcommerce.com/s-taixn69rog/images/stencil/original/products/26549/809725/121922__62954.1637648950.jpg'
   };
   Object.keys(PICS).forEach(function (k) { PICS[k] = 'https://' + PICS[k]; });
-  function img(cls, id) { return '<img class="' + cls + '" src="' + PICS[id] + '" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.style.visibility=\'hidden\'"' + (cls === 'x-bpic' ? ' data-binfo="' + id + '" title="About this bottle"' : '') + '>'; }
+  function img(cls, id) { return '<img class="' + cls + '" src="' + ((window.__VICIO_PICS || {})[id] || PICS[id]) + '" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.style.visibility=\'hidden\'"' + (cls === 'x-bpic' ? ' data-binfo="' + id + '" title="About this bottle"' : '') + '>'; }
   var LOGOS = {
     a_bibcoke: 'upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Coca-Cola_logo.svg/250px-Coca-Cola_logo.svg.png',
     a_bibsprite: 'upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Sprite_2022.svg/250px-Sprite_2022.svg.png',
@@ -92,7 +93,7 @@
     Array.prototype.forEach.call(sec.querySelectorAll('input[data-inv]'), function (el) {
       var id = el.dataset.inv, row = el.closest('tr'); if (!BEER[id] || !row || row.querySelector('.x-beerpic')) return;
       var cell = row.cells[0]; if (!cell) return;
-      cell.insertAdjacentHTML('afterbegin', '<img class="x-beerpic" src="https://' + BEER[id] + '" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.remove()">');
+      cell.insertAdjacentHTML('afterbegin', '<img class="x-beerpic" src="' + ((window.__VICIO_BEER || {})[id] || 'https://' + BEER[id]) + '" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.remove()">');
     });
   }
   function logos() {

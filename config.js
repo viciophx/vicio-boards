@@ -19,3 +19,5 @@ try { var bp = document.createElement('script'); bp.src = 'bottlepics.js?v=' + D
 try { var ac = document.createElement('script'); ac.src = 'atticcount.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(ac); } catch (e) {}
 /* Soda BIBs: next order day, order list, CO2, expiration dates (bib.js, Nov 22 2026). FOH only. */
 try { var bb = document.createElement('script'); bb.src = 'bib.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(bb); } catch (e) {}
+/* Kitchen Inventory in two tabs, Prepped (with photos) and Whole product (bohinv.js, Nov 22 2026). Kitchen only. */
+try { var bh = document.createElement('script'); bh.src = 'bohinv.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(bh); } catch (e) {}
