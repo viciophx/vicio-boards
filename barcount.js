@@ -27,7 +27,9 @@
    Managed from the admin page (Eric): when the shared sheet has a bar list (config/barlist, edited on Colette's Board),
    the count uses that list instead of the one built in here: its groups, order, names and renames (a renamed bottle's old
    ids are in was, so its numbers carry over). Deliveries logged on the admin page (barrecv) count toward the checks, so a
-   bottle that went up by what was delivered is not flagged. Each tap also saves who counted and when. */
+   bottle that went up by what was delivered is not flagged. Each tap also saves who counted and when.
+   Double-tap to clear (Eric): two quick taps on a bottle or a batch's level buttons clear that line's entry completely, and
+   the bar count says so at the top and in the column heading. */
 (function () {
   if (window.__vicioBarCount || window.VICIO_BOARD !== 'foh') return;
   window.__vicioBarCount = true;
@@ -132,7 +134,8 @@
   document.addEventListener('click', function (e) {
     var b = e.target.closest && e.target.closest('[data-blid]'); if (!b) return;
     e.preventDefault(); e.stopPropagation();
-    var id = b.dataset.blid, v = +b.dataset.blv, cur = (S.inv && S.inv.c || {})[id];
+    var id = b.dataset.blid; if (dbl(id)) { setVal(id, null); return; }
+    var v = +b.dataset.blv, cur = (S.inv && S.inv.c || {})[id];
     setVal(id, cur != null && +cur === v ? null : v);
   }, true);
   function relayout() {
@@ -140,7 +143,7 @@
     Array.prototype.forEach.call(sec.querySelectorAll('[data-fold^="inv_"] table'), function (t) {
       if (t.dataset.rl) return; t.dataset.rl = '1';
       var hr = t.tHead && t.tHead.rows[0];
-      if (hr && hr.cells.length === 5) { var h = hr.cells; hr.insertBefore(h[4], h[1]); h[3].remove(); h[1].textContent = /beer/i.test((t.closest('[data-fold^="inv_"]') || {}).dataset.fold || '') ? 'Count' : 'Tap the level'; }
+      if (hr && hr.cells.length === 5) { var h = hr.cells; hr.insertBefore(h[4], h[1]); h[3].remove(); h[1].innerHTML = /beer/i.test((t.closest('[data-fold^="inv_"]') || {}).dataset.fold || '') ? 'Count' : 'Tap the level <span class="x-dbl">\u00b7 double-tap to clear</span>'; }
       Array.prototype.forEach.call(t.tBodies[0] ? t.tBodies[0].rows : [], function (r) {
         if (r.cells.length !== 5) return;
         var c = r.cells, name = c[0], last = c[1], par = c[2], need = c[3], cnt = c[4];
@@ -174,7 +177,7 @@
       }
       if (html && cell) cell.insertAdjacentHTML('beforeend', '<div class="x-flag">' + html + '</div>');
     });
-    var top = '';
+    var top = '<p class="x-dblnote">Tip: double-tap a bottle to clear its entry and start that line over.</p>';
     if (re.length) top += '<p class="x-need"><span class="pill warn">Recheck ' + re.length + '</span> ' + re.map(function (n) { return String(n).replace(/</g, '&lt;'); }).join(', ') + '</p>';
     if (mk.length) top += '<p class="x-need"><span class="pill warn">Batches to make</span> ' + mk.join(', ') + '</p>';
     var st = sec.querySelector(':scope > p.status') || sec.querySelector('p.status');
@@ -216,6 +219,8 @@
       var un = d0.doc('config/bar').onSnapshot(function (s) { setTimeout(function () { try { un && un(); } catch (e) {} }, 0); go(s && s.exists ? s.data() : {}); }, function () {});
     } else if (S.barcfg && Object.keys(S.barcfg).length) go(S.barcfg);
   }
+  var LAST = {};
+  function dbl(id) { var t = Date.now(), hit = LAST[id] && t - LAST[id] < 400; LAST[id] = hit ? 0 : t; return hit; }
   function setVal(id, v) {
     if (v != null) v = Math.round(v * 100) / 100;
     S.inv = Object.assign({}, S.inv, { c: Object.assign({}, (S.inv || {}).c, (function () { var o = {}; o[id] = v; return o; })()) });
@@ -228,7 +233,8 @@
       e.preventDefault(); e.stopPropagation();
       var svg = b.querySelector('svg'), r = svg.getBoundingClientRect(), y = (e.clientY - r.top) * BH / r.height;
       var k = Math.max(1, Math.min(10, Math.ceil((BB - y) / (BB - BT) * 10 - 0.0001)));
-      var id = b.dataset.tcid, sp = split((S.inv && S.inv.c || {})[id]), lvl = k / 10;
+      var id = b.dataset.tcid; if (dbl(id)) { setVal(id, null); return; }
+      var sp = split((S.inv && S.inv.c || {})[id]), lvl = k / 10;
       if (!sp.none && Math.abs(sp.frac - lvl) < 0.01) setVal(id, sp.full ? sp.full : null); else setVal(id, sp.full + lvl);
       return;
     }
@@ -250,7 +256,7 @@
     '.x-tcs{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:92px}.x-tcv{font:700 24px/1 system-ui,-apple-system,sans-serif}.x-tcl{font:600 10px system-ui,-apple-system,sans-serif;color:var(--muted,#A1A1AA);text-transform:uppercase;letter-spacing:.04em}' +
     '.x-tcf{display:flex;align-items:center;gap:6px}.x-tcf .btn{min-width:36px;min-height:36px;padding:0;font-size:18px}.x-tcf b{min-width:16px;text-align:center}.x-tc0{min-height:30px;padding:2px 8px;font-size:12px}.x-tc0.on{background:var(--cherry,#8B1E1E);border-color:var(--cherry,#8B1E1E);color:#fff}' +
     '.x-par{display:flex;align-items:center;gap:6px;margin-top:6px;font:600 11px system-ui,-apple-system,sans-serif;color:var(--muted,#A1A1AA);text-transform:uppercase;letter-spacing:.04em}.x-par input{width:64px;min-height:34px;color:var(--cherry,#E5484D)}.x-par,.x-par b{color:var(--cherry,#E5484D)}.x-par b{font-size:16px}.x-par svg{flex:none}' +
-    '[data-fold="sec_bar"] td.x-cnt{text-align:left}[data-fold="sec_bar"] .x-tc{justify-content:flex-start}.x-flag{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px}.x-fbtn{min-height:30px;padding:2px 10px;font-size:12px}.x-fnote{font-size:12px;color:var(--muted,#A1A1AA)}.x-need{margin:4px 0 8px;font-weight:600}.x-blv{display:flex;flex-wrap:wrap;gap:5px}.x-blb{display:inline-flex;flex-direction:column;align-items:center;gap:1px;min-height:48px;min-width:50px;padding:4px 6px;border-radius:9px;border:1px solid var(--line,#2E2E34);background:var(--bg,#000);color:var(--ink,#EDEDF0);cursor:pointer}.x-blb small{font:600 10px/1 system-ui,-apple-system,sans-serif}.x-blb.on{background:var(--good,#1F7A4D);border-color:var(--good,#1F7A4D);color:#fff}.x-blb.make{color:var(--cherry,#E5484D)}.x-blb.make.on{background:var(--cherry,#8B1E1E);border-color:var(--cherry,#8B1E1E);color:#fff}'; document.head.appendChild(st); })();
+    '[data-fold="sec_bar"] td.x-cnt{text-align:left}[data-fold="sec_bar"] .x-tc{justify-content:flex-start}.x-flag{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px}.x-fbtn{min-height:30px;padding:2px 10px;font-size:12px}.x-fnote{font-size:12px;color:var(--muted,#A1A1AA)}.x-need{margin:4px 0 8px;font-weight:600}.x-dblnote{margin:4px 0 8px;font-size:13px;color:var(--muted,#A1A1AA)}.x-dbl{font-weight:500;text-transform:none;letter-spacing:0;opacity:.8}.x-blv{display:flex;flex-wrap:wrap;gap:5px}.x-blb{display:inline-flex;flex-direction:column;align-items:center;gap:1px;min-height:48px;min-width:50px;padding:4px 6px;border-radius:9px;border:1px solid var(--line,#2E2E34);background:var(--bg,#000);color:var(--ink,#EDEDF0);cursor:pointer}.x-blb small{font:600 10px/1 system-ui,-apple-system,sans-serif}.x-blb.on{background:var(--good,#1F7A4D);border-color:var(--good,#1F7A4D);color:#fff}.x-blb.make{color:var(--cherry,#E5484D)}.x-blb.make.on{background:var(--cherry,#8B1E1E);border-color:var(--cherry,#8B1E1E);color:#fff}'; document.head.appendChild(st); })();
 
   (function start() {
     if (!apply() || typeof render !== 'function') return setTimeout(start, 200);
