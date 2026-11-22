@@ -23,7 +23,11 @@
    else sees the red number with the lock.
    Real del Valle (Eric): the speed rail line is spelled as on the bottle. Its old id (real_de_valle_blanco) carries over:
    last week's number and this week's count show on the new line, and its par of 2 is copied once (flag rdv1121).
-   House batches are a level (Eric): 100%, 75%, 50%, 25% or Make, one tap, instead of the bottle. */
+   House batches are a level (Eric): 100%, 75%, 50%, 25% or Make, one tap, instead of the bottle.
+   Managed from the admin page (Eric): when the shared sheet has a bar list (config/barlist, edited on Colette's Board),
+   the count uses that list instead of the one built in here: its groups, order, names and renames (a renamed bottle's old
+   ids are in was, so its numbers carry over). Deliveries logged on the admin page (barrecv) count toward the checks, so a
+   bottle that went up by what was delivered is not flagged. Each tap also saves who counted and when. */
 (function () {
   if (window.__vicioBarCount || window.VICIO_BOARD !== 'foh') return;
   window.__vicioBarCount = true;
@@ -78,14 +82,34 @@
     });
   }
   var IN_COLETTE = false; try { IN_COLETTE = !!(window.parent && window.parent !== window); } catch (e) { IN_COLETTE = true; }
-  var OLD_RDV = 'real_de_valle_blanco', NEW_RDV = 'real_del_valle_blanco';
+  var ALIAS = { real_del_valle_blanco: ['real_de_valle_blanco'] }, RECV = {};
   function aliasRdv() {
-    [S.prevInv, S.inv].forEach(function (o) { if (o && o.c && o.c[OLD_RDV] != null && o.c[NEW_RDV] == null) o.c[NEW_RDV] = o.c[OLD_RDV]; });
-    var cfg = S.barcfg || {}, par = cfg.par || {};
+    Object.keys(ALIAS).forEach(function (nw) { (ALIAS[nw] || []).forEach(function (old) {
+      [S.prevInv, S.inv].forEach(function (o) { if (o && o.c && o.c[old] != null && o.c[nw] == null) o.c[nw] = o.c[old]; });
+      var par = (S.barcfg || {}).par; if (par && par[old] != null && par[nw] == null) par[nw] = par[old];
+    }); });
+    var cfg = S.barcfg || {}, par = cfg.par || {}, NEW_RDV = 'real_del_valle_blanco';
     if (!cfg.rdv1121 && !aliasRdv.saved && cfg.par1121 && typeof save === 'function') {
-      aliasRdv.saved = true; var at = Date.now(), p = {}; p[NEW_RDV] = par[OLD_RDV] != null ? par[OLD_RDV] : 2;
+      aliasRdv.saved = true; var at = Date.now(), p = {}; p[NEW_RDV] = par[NEW_RDV] != null ? par[NEW_RDV] : 2;
       S.barcfg = Object.assign({}, cfg, { par: Object.assign({}, par, p), rdv1121: at }); save('config/bar', { par: p, rdv1121: at });
     }
+  }
+  function applyDb(groups) {
+    try {
+      BARINV.length = 0; INVITEMS.length = 0; var al = {};
+      groups.forEach(function (g) {
+        var names = (g.items || []).map(function (i) { return i.name; }).filter(Boolean);
+        BARINV.push([g.name, names]);
+        (g.items || []).forEach(function (i) { if (!i.name) return; var id = slug(i.name); INVITEMS.push([id, i.name, g.name]); if (i.was && i.was.length) al[id] = i.was.slice(); });
+      });
+      ALIAS = al;
+    } catch (e) {}
+  }
+  function recvFor(id) {
+    var wk = ui.week, d = new Date(wk + 'T12:00:00'); d.setDate(d.getDate() + 6);
+    var end = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'), n = 0;
+    Object.keys(RECV || {}).forEach(function (k) { var r = RECV[k]; if (r && r.date >= wk && r.date <= end && r.lines && r.lines[id] != null) n += +r.lines[id] || 0; });
+    return n;
   }
   var LV = [[1, '100%'], [0.75, '75%'], [0.5, '50%'], [0.25, '25%'], [0, 'Make']];
   function lvIcon(v) {
@@ -144,7 +168,7 @@
       if (/\(batch\)/i.test(name)) {
         if (v < 0.5) { mk.push(name.replace(/\s*\(batch\)/i, '')); html = '<span class="pill warn">Make more</span>' + (SPEC[name] ? ' <button type="button" class="btn x-fbtn" data-bspec="' + SPEC[name] + '">Spec</button>' : ' <span class="x-fnote">No batch recipe written yet</span>'); }
       } else if (pv[id] != null && !isNaN(+pv[id]) && !ok[id]) {
-        var p = +pv[id];
+        var p = +pv[id] + recvFor(id);
         if (v - p >= 0.2 - 1e-9) { re.push(name); html = '<span class="pill warn">Up from ' + fmtN(p) + '</span> <button type="button" class="btn x-fbtn" data-fok="' + id + '">Delivery came</button>'; }
         else if (p - v >= 1.5 - 1e-9) { re.push(name); html = '<span class="pill warn">Down from ' + fmtN(p) + '</span> <button type="button" class="btn x-fbtn" data-fok="' + id + '">Count is right</button>'; }
       }
@@ -195,7 +219,8 @@
   function setVal(id, v) {
     if (v != null) v = Math.round(v * 100) / 100;
     S.inv = Object.assign({}, S.inv, { c: Object.assign({}, (S.inv || {}).c, (function () { var o = {}; o[id] = v; return o; })()) });
-    var patch = { c: {} }; patch.c[id] = v; save('barinv/' + ui.week, patch); render();
+    var patch = { c: {}, at: Date.now() }; patch.c[id] = v; try { var wn = typeof whoName === 'function' ? whoName() : ''; if (wn) patch.who = wn; } catch (e) {}
+    save('barinv/' + ui.week, patch); render();
   }
   document.addEventListener('click', function (e) {
     var b = e.target.closest && e.target.closest('[data-tcid]');
@@ -230,6 +255,8 @@
   (function start() {
     if (!apply() || typeof render !== 'function') return setTimeout(start, 200);
     setTimeout(function () { try { setPars(); } catch (e) {} }, 4000);
+    try { if (typeof watchDoc === 'function') watchDoc('config/barlist', function (d) { if (d && Array.isArray(d.groups) && d.groups.length) { applyDb(d.groups); render(); } }); } catch (e) {}
+    try { if (typeof watchCol === 'function') watchCol('barrecv', function (o) { RECV = o || {}; render(); }); } catch (e) {}
     var r0 = render; render = function () { try { aliasRdv(); } catch (e) {} var out = r0.apply(this, arguments); try { tapCount(); } catch (e) {} try { batchLevels(); } catch (e) {} try { relayout(); } catch (e) {} try { checks(); } catch (e) {} return out; };
     render();
   })();
