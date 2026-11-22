@@ -7,7 +7,9 @@
    Tap to count (Eric): each liquor and wine line shows a bottle; tap where the liquid is, from .1 at the bottom to 1 at the
    top (10 points). Full backups are a + / - beside it, so the count is full backups plus the open bottle (2 backups and a
    bottle at .6 is 2.6). Tap the same point again to clear the open bottle. None left marks it 0. Beer stays a number box.
-   Surfside is gone (Eric): off the bar count (the beer group is now just Beers), off the Drinks page, and out of the beer quiz. */
+   Surfside is gone (Eric): off the bar count (the beer group is now just Beers), off the Drinks page, and out of the beer quiz.
+   Layout (Eric): the par sits under each bottle's name, and the tap-the-level bottle (or the number box, for beer) is right
+   next to the name. Last week and the order amount follow. */
 (function () {
   if (window.__vicioBarCount || window.VICIO_BOARD !== 'foh') return;
   window.__vicioBarCount = true;
@@ -61,6 +63,22 @@
       var th = cell.closest('table') && cell.closest('table').querySelector('thead th:last-child'); if (th && /^Count/.test(th.textContent)) th.textContent = 'Tap the level';
     });
   }
+  function relayout() {
+    var sec = document.querySelector('[data-fold="sec_bar"]'); if (!sec) return;
+    Array.prototype.forEach.call(sec.querySelectorAll('[data-fold^="inv_"] table'), function (t) {
+      if (t.dataset.rl) return; t.dataset.rl = '1';
+      var hr = t.tHead && t.tHead.rows[0];
+      if (hr && hr.cells.length === 5) { var h = hr.cells; hr.insertBefore(h[4], h[1]); h[3].remove(); h[1].textContent = /beer/i.test((t.closest('[data-fold^="inv_"]') || {}).dataset.fold || '') ? 'Count' : 'Tap the level'; }
+      Array.prototype.forEach.call(t.tBodies[0] ? t.tBodies[0].rows : [], function (r) {
+        if (r.cells.length !== 5) return;
+        var c = r.cells, name = c[0], last = c[1], par = c[2], need = c[3], cnt = c[4];
+        var pw = document.createElement('div'); pw.className = 'x-par'; pw.innerHTML = '<span>Par</span>';
+        while (par.firstChild) pw.appendChild(par.firstChild);
+        name.appendChild(pw); par.remove();
+        r.insertBefore(cnt, last); cnt.classList.add('x-cnt');
+      });
+    });
+  }
   function setVal(id, v) {
     if (v != null) v = Math.round(v * 10) / 10;
     S.inv = Object.assign({}, S.inv, { c: Object.assign({}, (S.inv || {}).c, (function () { var o = {}; o[id] = v; return o; })()) });
@@ -92,11 +110,13 @@
   (function () { var st = document.createElement('style'); st.textContent =
     '.x-tc{display:flex;align-items:center;gap:10px;justify-content:flex-end}.x-tcb{cursor:pointer;color:var(--ink,#EDEDF0);touch-action:manipulation;border-radius:10px;padding:2px 4px;background:var(--bg,#000);border:1px solid var(--line,#2E2E34)}' +
     '.x-tcs{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:92px}.x-tcv{font:700 24px/1 system-ui,-apple-system,sans-serif}.x-tcl{font:600 10px system-ui,-apple-system,sans-serif;color:var(--muted,#A1A1AA);text-transform:uppercase;letter-spacing:.04em}' +
-    '.x-tcf{display:flex;align-items:center;gap:6px}.x-tcf .btn{min-width:36px;min-height:36px;padding:0;font-size:18px}.x-tcf b{min-width:16px;text-align:center}.x-tc0{min-height:30px;padding:2px 8px;font-size:12px}.x-tc0.on{background:var(--cherry,#8B1E1E);border-color:var(--cherry,#8B1E1E);color:#fff}'; document.head.appendChild(st); })();
+    '.x-tcf{display:flex;align-items:center;gap:6px}.x-tcf .btn{min-width:36px;min-height:36px;padding:0;font-size:18px}.x-tcf b{min-width:16px;text-align:center}.x-tc0{min-height:30px;padding:2px 8px;font-size:12px}.x-tc0.on{background:var(--cherry,#8B1E1E);border-color:var(--cherry,#8B1E1E);color:#fff}' +
+    '.x-par{display:flex;align-items:center;gap:6px;margin-top:6px;font:600 11px system-ui,-apple-system,sans-serif;color:var(--muted,#A1A1AA);text-transform:uppercase;letter-spacing:.04em}.x-par input{width:64px;min-height:34px}' +
+    '[data-fold="sec_bar"] td.x-cnt{text-align:left}[data-fold="sec_bar"] .x-tc{justify-content:flex-start}'; document.head.appendChild(st); })();
 
   (function start() {
     if (!apply() || typeof render !== 'function') return setTimeout(start, 200);
-    var r0 = render; render = function () { var out = r0.apply(this, arguments); try { tapCount(); } catch (e) {} return out; };
+    var r0 = render; render = function () { var out = r0.apply(this, arguments); try { tapCount(); } catch (e) {} try { relayout(); } catch (e) {} return out; };
     render();
   })();
 })();
