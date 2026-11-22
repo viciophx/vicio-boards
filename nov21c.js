@@ -6,7 +6,8 @@
    3. Attic inventory count: the one "Folding to-go boxes" line is now the three boxes Vicio carries: pizza boxes, large
       to-go boxes and small to-go boxes.
    4. Beer cooler count: Negra Modelo removed (Eric). Counts already saved for it stay in the record.
-   5. Mango Cart removed (Eric): from the bar inventory count, the beer list on the Drinks page, and the beer quiz. */
+   5. Mango Cart removed (Eric): from the bar inventory count, the beer list on the Drinks page, and the beer quiz.
+   6. Red Bull removed (Eric): from the N/A inventory count; the one quiz answer that named it now says energy drink. */
 (function () {
   if (window.__vicioNov21c || window.VICIO_BOARD !== 'foh') return;
   window.__vicioNov21c = true;
@@ -77,6 +78,14 @@
         hit = true;
       }
       dropItems.mango = hit;
+    } catch (e) {}
+    try {
+      if (dropItems.rb) return;
+      var isR = function (n) { return /red bull/i.test(String(n || '')); };
+      if (typeof NABEV !== 'undefined') NABEV.forEach(function (g) { for (var i = g[1].length - 1; i >= 0; i--) if (isR(g[1][i])) g[1].splice(i, 1); });
+      if (typeof NAITEMS !== 'undefined') for (var j = NAITEMS.length - 1; j >= 0; j--) if (isR(NAITEMS[j][1])) NAITEMS.splice(j, 1);
+      if (typeof QUIZZES !== 'undefined') Object.keys(QUIZZES).forEach(function (k) { var q = QUIZZES[k] && QUIZZES[k].q; if (Array.isArray(q)) q.forEach(function (x) { if (Array.isArray(x[2])) x[2] = x[2].map(function (w) { return String(w).replace(/Red Bull/gi, 'energy drink'); }); }); });
+      dropItems.rb = true;
     } catch (e) {}
   }
   (function start() {
