@@ -10,7 +10,9 @@
    6. Red Bull removed (Eric): from the N/A inventory count; the one quiz answer that named it now says energy drink.
    7. Also removed from the N/A inventory count (Eric): Sprite (bottled; also off the No alcohol list on the Drinks page),
       Big Marble Ginger Beer, Canada Dry Ginger Ale, Canada Dry Soda Water, Chameleon Espresso, Zing Zang and Clamato.
-      Fountain Sprite (bag-in-box) stays. */
+      Fountain Sprite (bag-in-box) stays.
+   8. Inventory: Soda BIBs & CO2 is its own section, right after the Attic count, instead of a group inside it (Eric).
+      Counts are saved by item, so nothing already counted is lost; it has its own Submit. */
 (function () {
   if (window.__vicioNov21c || window.VICIO_BOARD !== 'foh') return;
   window.__vicioNov21c = true;
@@ -62,6 +64,20 @@
       if (typeof ES !== 'undefined') { ES['Pizza boxes'] = 'Cajas de pizza'; ES['To-go boxes, large'] = 'Cajas para llevar, grandes'; ES['To-go boxes, small'] = 'Cajas para llevar, chicas'; ES['bundles'] = ES['bundles'] || 'paquetes'; }
     } catch (e) {}
   }
+  function bibForm() {
+    try {
+      if (typeof COUNTFORMS === 'undefined' || bibForm.done || COUNTFORMS.some(function (f) { return f.id === 'inv_bib'; })) return;
+      var ai = COUNTFORMS.findIndex(function (f) { return f.id === 'inv_attic'; }); if (ai < 0) return;
+      var at = COUNTFORMS[ai], gi = at.groups.findIndex(function (g) { return /co2|soda/i.test(g[0]) && g[1].some(function (it) { return /^a_bib|^a_co2/.test(it[0]); }); });
+      if (gi < 0) return;
+      var grp = at.groups.splice(gi, 1)[0];
+      at.desc = 'Paper goods and cleaning. Soda BIBs and CO2 have their own count below. The freezer is the kitchen\'s count. Partials in tenths, 0.1 to 0.9.';
+      COUNTFORMS.splice(ai + 1, 0, { id: 'inv_bib', name: 'Soda BIBs & CO2', desc: 'Bag-in-box sodas and the CO2 tanks. Lift each box to judge partials, in tenths, 0.1 to 0.9. Count full spare CO2 tanks.', groups: [['Bag-in-box and CO2', grp[1]]] });
+      if (typeof FORMS !== 'undefined') { var fi = FORMS.findIndex(function (f) { return f[0] === 'inv_attic'; }); FORMS.splice(fi + 1, 0, ['inv_bib', 'Soda BIBs & CO2']); }
+      if (typeof ES !== 'undefined') { ES['Soda BIBs & CO2'] = 'Bolsas de soda y CO2'; ES['Bag-in-box and CO2'] = 'Bolsas de soda y CO2'; }
+      bibForm.done = true;
+    } catch (e) {}
+  }
   function dropItems() {
     try {
       if (typeof COUNTFORMS === 'undefined' || dropItems.done) return;
@@ -102,7 +118,7 @@
   }
   (function start() {
     if (typeof render !== 'function' || typeof ui === 'undefined' || !document.getElementById('view')) return setTimeout(start, 200);
-    togoBoxes(); dropItems();
+    togoBoxes(); dropItems(); bibForm();
     var r0 = render;
     render = function () { var out = r0.apply(this, arguments); setTimeout(function () { try { shorter(); } catch (e) {} try { fixLayout1121d(); } catch (e) {} }, 30); return out; };
     render();
