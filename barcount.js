@@ -11,7 +11,12 @@
    Layout (Eric): the par sits under each bottle's name, and the tap-the-level bottle (or the number box, for beer) is right
    next to the name. Last week and the order amount follow.
    Pars, once (Eric): every bar count line gets a par of 1, except the speed rail, which gets 2. Saved to the shared bar
-   settings with a par1121 mark so it never runs twice; managers can still change any par after. */
+   settings with a par1121 mark so it never runs twice; managers can still change any par after.
+   Checks (Eric): a bottle counted higher than last week (by .2 or more), or 1.5 bottles or more lower, is flagged on its
+   line and listed at the top of the bar count to recheck. One tap says a delivery came, or that the count is right, and the
+   flag clears for that week (saved with the count as ok.<id>). Beer and house batches are not flagged this way.
+   Batches (Eric): a house batch counted under half shows Make more, is listed at the top, and links to the drink's spec
+   where there is one. */
 (function () {
   if (window.__vicioBarCount || window.VICIO_BOARD !== 'foh') return;
   window.__vicioBarCount = true;
@@ -81,6 +86,51 @@
       });
     });
   }
+  var SPEC = { 'Guava Goddess (batch)': 'Guava Goddess', 'Mexican Candy (batch)': 'Mexican Candy', 'Green Tea (batch)': 'Green Tea', 'Vegas Bomb (batch)': 'Vegas Bomb' };
+  function fmtN(v) { return (+v).toFixed(1).replace(/\.0$/, ''); }
+  function checks() {
+    var sec = document.querySelector('[data-fold="sec_bar"]'); if (!sec || sec.dataset.chk) return; sec.dataset.chk = '1';
+    var c = (S.inv && S.inv.c) || {}, pv = (S.prevInv && S.prevInv.c) || {}, ok = (S.inv && S.inv.ok) || {}, re = [], mk = [];
+    INVITEMS.forEach(function (it) {
+      var id = it[0], name = it[1], grp = it[2] || ''; if (/beer/i.test(grp)) return;
+      var v = c[id], row = sec.querySelector('[data-tcid="' + id + '"]'); row = row && row.closest('tr');
+      if (v == null || v === '' || isNaN(+v)) return; v = +v;
+      var cell = row && row.cells[0], html = '';
+      if (/\(batch\)/i.test(name)) {
+        if (v < 0.5) { mk.push(name.replace(/\s*\(batch\)/i, '')); html = '<span class="pill warn">Make more</span>' + (SPEC[name] ? ' <button type="button" class="btn x-fbtn" data-bspec="' + SPEC[name] + '">Spec</button>' : ' <span class="x-fnote">No batch recipe written yet</span>'); }
+      } else if (pv[id] != null && !isNaN(+pv[id]) && !ok[id]) {
+        var p = +pv[id];
+        if (v - p >= 0.2 - 1e-9) { re.push(name); html = '<span class="pill warn">Up from ' + fmtN(p) + '</span> <button type="button" class="btn x-fbtn" data-fok="' + id + '">Delivery came</button>'; }
+        else if (p - v >= 1.5 - 1e-9) { re.push(name); html = '<span class="pill warn">Down from ' + fmtN(p) + '</span> <button type="button" class="btn x-fbtn" data-fok="' + id + '">Count is right</button>'; }
+      }
+      if (html && cell) cell.insertAdjacentHTML('beforeend', '<div class="x-flag">' + html + '</div>');
+    });
+    var top = '';
+    if (re.length) top += '<p class="x-need"><span class="pill warn">Recheck ' + re.length + '</span> ' + re.map(function (n) { return String(n).replace(/</g, '&lt;'); }).join(', ') + '</p>';
+    if (mk.length) top += '<p class="x-need"><span class="pill warn">Batches to make</span> ' + mk.join(', ') + '</p>';
+    var st = sec.querySelector(':scope > p.status') || sec.querySelector('p.status');
+    if (top && st) st.insertAdjacentHTML('afterend', top);
+  }
+  document.addEventListener('click', function (e) {
+    var f = e.target.closest && e.target.closest('[data-fok]');
+    if (f) {
+      e.preventDefault(); e.stopPropagation();
+      var id = f.dataset.fok, o = {}; o[id] = true;
+      S.inv = Object.assign({}, S.inv, { ok: Object.assign({}, (S.inv || {}).ok, o) });
+      save('barinv/' + ui.week, { ok: o }); render(); return;
+    }
+    var b = e.target.closest && e.target.closest('[data-bspec]');
+    if (b) {
+      e.preventDefault(); e.stopPropagation();
+      var nm = b.dataset.bspec; ui.barView = true; ui.fold = ui.fold || {};
+      ['Cocktails', 'Margaritas', 'Shots', 'Mocktails'].forEach(function (g) { ui.fold['pg:Drinks:' + g] = true; });
+      ui.tab = 'drinks'; render();
+      setTimeout(function () {
+        var hit = Array.prototype.filter.call(document.querySelectorAll('[data-act="dsel"]'), function (x) { return (x.textContent || '').trim().indexOf(nm) === 0; })[0];
+        if (hit) { hit.click(); setTimeout(function () { window.scrollTo(0, 0); }, 50); }
+      }, 40);
+    }
+  }, true);
   function setPars() {
     if (setPars.done) return;
     var d0 = (typeof db !== 'undefined') ? db : null;
@@ -130,12 +180,12 @@
     '.x-tcs{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:92px}.x-tcv{font:700 24px/1 system-ui,-apple-system,sans-serif}.x-tcl{font:600 10px system-ui,-apple-system,sans-serif;color:var(--muted,#A1A1AA);text-transform:uppercase;letter-spacing:.04em}' +
     '.x-tcf{display:flex;align-items:center;gap:6px}.x-tcf .btn{min-width:36px;min-height:36px;padding:0;font-size:18px}.x-tcf b{min-width:16px;text-align:center}.x-tc0{min-height:30px;padding:2px 8px;font-size:12px}.x-tc0.on{background:var(--cherry,#8B1E1E);border-color:var(--cherry,#8B1E1E);color:#fff}' +
     '.x-par{display:flex;align-items:center;gap:6px;margin-top:6px;font:600 11px system-ui,-apple-system,sans-serif;color:var(--muted,#A1A1AA);text-transform:uppercase;letter-spacing:.04em}.x-par input{width:64px;min-height:34px}' +
-    '[data-fold="sec_bar"] td.x-cnt{text-align:left}[data-fold="sec_bar"] .x-tc{justify-content:flex-start}'; document.head.appendChild(st); })();
+    '[data-fold="sec_bar"] td.x-cnt{text-align:left}[data-fold="sec_bar"] .x-tc{justify-content:flex-start}.x-flag{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px}.x-fbtn{min-height:30px;padding:2px 10px;font-size:12px}.x-fnote{font-size:12px;color:var(--muted,#A1A1AA)}.x-need{margin:4px 0 8px;font-weight:600}'; document.head.appendChild(st); })();
 
   (function start() {
     if (!apply() || typeof render !== 'function') return setTimeout(start, 200);
     setTimeout(function () { try { setPars(); } catch (e) {} }, 4000);
-    var r0 = render; render = function () { var out = r0.apply(this, arguments); try { tapCount(); } catch (e) {} try { relayout(); } catch (e) {} return out; };
+    var r0 = render; render = function () { var out = r0.apply(this, arguments); try { tapCount(); } catch (e) {} try { relayout(); } catch (e) {} try { checks(); } catch (e) {} return out; };
     render();
   })();
 })();
