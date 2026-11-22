@@ -13,3 +13,5 @@ try { var bc = document.createElement('script'); bc.src = 'barcount.js?v=' + Dat
 try { var pl = document.createElement('script'); pl.src = 'parlock.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(pl); } catch (e) {}
 /* Tap a bottle's name on the bar count for its profile (bottleinfo.js, Nov 22 2026). FOH only. */
 try { var bi = document.createElement('script'); bi.src = 'bottleinfo.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(bi); } catch (e) {}
+/* Bottle photos on the bar count (bottlepics.js, Nov 22 2026). FOH only. */
+try { var bp = document.createElement('script'); bp.src = 'bottlepics.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(bp); } catch (e) {}
