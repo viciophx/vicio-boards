@@ -29,7 +29,11 @@
    ids are in was, so its numbers carry over). Deliveries logged on the admin page (barrecv) count toward the checks, so a
    bottle that went up by what was delivered is not flagged. Each tap also saves who counted and when.
    Double-tap to clear (Eric): two quick taps on a bottle or a batch's level buttons clear that line's entry completely, and
-   the bar count says so at the top and in the column heading. */
+   the bar count says so at the top and in the column heading.
+   Slide to set the level (Eric): picking a point with a tap was hard on the iPad and phone, so the open bottle now slides.
+   Drag up or down on the bottle and the liquid follows your finger, or use the slider under it (0 to 1 in tenths); the
+   number updates as you move and saves when you let go. A plain tap still sets that level, and a quick double tap still
+   clears the line. */
 (function () {
   if (window.__vicioBarCount || window.VICIO_BOARD !== 'foh') return;
   window.__vicioBarCount = true;
@@ -79,6 +83,7 @@
       var id = inp.dataset.inv, sp = split(c[id]), cell = inp.closest('td'); if (!cell) return;
       var total = sp.none ? '\u2013' : (sp.full + sp.frac).toFixed(1).replace(/\.0$/, '');
       cell.innerHTML = '<div class="x-tc"><div class="x-tcb" data-tcid="' + id + '" role="slider" aria-label="Open bottle level" aria-valuemin="0" aria-valuemax="1" aria-valuenow="' + sp.frac + '">' + bottleSvg(sp.frac) + '</div>' +
+        '<input type="range" class="x-tcr" min="0" max="10" step="1" value="' + Math.round(sp.frac * 10) + '" data-tcr="' + id + '" aria-label="Open bottle level, tenths">' +
         '<div class="x-tcs"><b class="x-tcv">' + total + '</b><span class="x-tcl">Full backups</span><span class="x-tcf"><button type="button" class="btn" data-tcfull="-1" data-tcid2="' + id + '" aria-label="One fewer full bottle">\u2212</button><b>' + sp.full + '</b><button type="button" class="btn" data-tcfull="1" data-tcid2="' + id + '" aria-label="One more full bottle">+</button></span><button type="button" class="btn x-tc0' + (c[id] === 0 ? ' on' : '') + '" data-tczero="' + id + '">None left</button></div></div>';
       var th = cell.closest('table') && cell.closest('table').querySelector('thead th:last-child'); if (th && /^Count/.test(th.textContent)) th.textContent = 'Tap the level';
     });
@@ -143,7 +148,7 @@
     Array.prototype.forEach.call(sec.querySelectorAll('[data-fold^="inv_"] table'), function (t) {
       if (t.dataset.rl) return; t.dataset.rl = '1';
       var hr = t.tHead && t.tHead.rows[0];
-      if (hr && hr.cells.length === 5) { var h = hr.cells; hr.insertBefore(h[4], h[1]); h[3].remove(); h[1].innerHTML = /beer/i.test((t.closest('[data-fold^="inv_"]') || {}).dataset.fold || '') ? 'Count' : 'Tap the level <span class="x-dbl">\u00b7 double-tap to clear</span>'; }
+      if (hr && hr.cells.length === 5) { var h = hr.cells; hr.insertBefore(h[4], h[1]); h[3].remove(); h[1].innerHTML = /beer/i.test((t.closest('[data-fold^="inv_"]') || {}).dataset.fold || '') ? 'Count' : 'Slide the level <span class="x-dbl">\u00b7 double-tap to clear</span>'; }
       Array.prototype.forEach.call(t.tBodies[0] ? t.tBodies[0].rows : [], function (r) {
         if (r.cells.length !== 5) return;
         var c = r.cells, name = c[0], last = c[1], par = c[2], need = c[3], cnt = c[4];
@@ -177,7 +182,7 @@
       }
       if (html && cell) cell.insertAdjacentHTML('beforeend', '<div class="x-flag">' + html + '</div>');
     });
-    var top = '<p class="x-dblnote">Tip: double-tap a bottle to clear its entry and start that line over.</p>';
+    var top = '<p class="x-dblnote">Tip: slide your finger up or down the bottle, or use the slider under it. Double-tap a bottle to clear its entry.</p>';
     if (re.length) top += '<p class="x-need"><span class="pill warn">Recheck ' + re.length + '</span> ' + re.map(function (n) { return String(n).replace(/</g, '&lt;'); }).join(', ') + '</p>';
     if (mk.length) top += '<p class="x-need"><span class="pill warn">Batches to make</span> ' + mk.join(', ') + '</p>';
     var st = sec.querySelector(':scope > p.status') || sec.querySelector('p.status');
@@ -229,15 +234,7 @@
   }
   document.addEventListener('click', function (e) {
     var b = e.target.closest && e.target.closest('[data-tcid]');
-    if (b) {
-      e.preventDefault(); e.stopPropagation();
-      var svg = b.querySelector('svg'), r = svg.getBoundingClientRect(), y = (e.clientY - r.top) * BH / r.height;
-      var k = Math.max(1, Math.min(10, Math.ceil((BB - y) / (BB - BT) * 10 - 0.0001)));
-      var id = b.dataset.tcid; if (dbl(id)) { setVal(id, null); return; }
-      var sp = split((S.inv && S.inv.c || {})[id]), lvl = k / 10;
-      if (!sp.none && Math.abs(sp.frac - lvl) < 0.01) setVal(id, sp.full ? sp.full : null); else setVal(id, sp.full + lvl);
-      return;
-    }
+    if (b) { e.preventDefault(); e.stopPropagation(); return; }
     var f = e.target.closest && e.target.closest('[data-tcfull]');
     if (f) {
       e.preventDefault(); e.stopPropagation();
@@ -251,8 +248,53 @@
       var cur = (S.inv && S.inv.c || {})[z.dataset.tczero]; setVal(z.dataset.tczero, cur === 0 ? null : 0);
     }
   }, true);
+  function lvlAt(b, clientY) {
+    var svg = b.querySelector('svg'), r = svg.getBoundingClientRect(), y = (clientY - r.top) * BH / r.height;
+    return Math.max(1, Math.min(10, Math.ceil((BB - y) / (BB - BT) * 10 - 0.0001))) / 10;
+  }
+  function preview(id, frac) {
+    var b = document.querySelector('[data-tcid="' + id + '"]'); if (!b) return;
+    var sp = split((S.inv && S.inv.c || {})[id]), wrap = b.closest('.x-tc');
+    b.innerHTML = bottleSvg(frac);
+    var v = wrap && wrap.querySelector('.x-tcv'); if (v) v.textContent = (sp.full + frac).toFixed(1).replace(/\.0$/, '');
+    var r = wrap && wrap.querySelector('.x-tcr'); if (r && +r.value !== Math.round(frac * 10)) r.value = Math.round(frac * 10);
+  }
+  var DRAG = null;
+  document.addEventListener('pointerdown', function (e) {
+    var b = e.target.closest && e.target.closest('[data-tcid]'); if (!b) return;
+    e.preventDefault();
+    DRAG = { id: b.dataset.tcid, b: b, y0: e.clientY, moved: false, lvl: lvlAt(b, e.clientY) };
+    try { b.setPointerCapture(e.pointerId); } catch (x) {}
+  }, true);
+  document.addEventListener('pointermove', function (e) {
+    if (!DRAG) return;
+    if (Math.abs(e.clientY - DRAG.y0) > 6) DRAG.moved = true;
+    if (!DRAG.moved) return;
+    if (!DRAG.b.isConnected) { var nb = document.querySelector('[data-tcid="' + DRAG.id + '"]'); if (nb) DRAG.b = nb; }
+    e.preventDefault(); DRAG.lvl = lvlAt(DRAG.b, e.clientY); preview(DRAG.id, DRAG.lvl);
+  }, true);
+  function endDrag(e) {
+    if (!DRAG) return; var d = DRAG; DRAG = null;
+    var sp = split((S.inv && S.inv.c || {})[d.id]);
+    if (d.moved) { LAST[d.id] = 0; setVal(d.id, sp.full + d.lvl); return; }
+    if (dbl(d.id)) { setVal(d.id, null); return; }
+    if (!sp.none && Math.abs(sp.frac - d.lvl) < 0.01) setVal(d.id, sp.full ? sp.full : null); else setVal(d.id, sp.full + d.lvl);
+  }
+  document.addEventListener('pointerup', endDrag, true);
+  document.addEventListener('pointercancel', function () { if (DRAG) { var id = DRAG.id; DRAG = null; render(); } }, true);
+  document.addEventListener('input', function (e) {
+    var r = e.target; if (!r || !r.dataset || !r.dataset.tcr) return; preview(r.dataset.tcr, (+r.value) / 10);
+  }, true);
+  document.addEventListener('change', function (e) {
+    var r = e.target; if (!r || !r.dataset || !r.dataset.tcr) return;
+    var id = r.dataset.tcr, sp = split((S.inv && S.inv.c || {})[id]), f = (+r.value) / 10;
+    setVal(id, sp.full + f === 0 && sp.none ? 0 : sp.full + f);
+  }, true);
   (function () { var st = document.createElement('style'); st.textContent =
-    '.x-tc{display:flex;align-items:center;gap:10px;justify-content:flex-end}.x-tcb{cursor:pointer;color:var(--ink,#EDEDF0);touch-action:manipulation;border-radius:10px;padding:2px 4px;background:var(--bg,#000);border:1px solid var(--line,#2E2E34)}' +
+    '.x-tc{display:flex;align-items:center;gap:10px;justify-content:flex-end}.x-tcb{cursor:ns-resize;color:var(--ink,#EDEDF0);touch-action:none;user-select:none;-webkit-user-select:none;border-radius:10px;padding:2px 4px;background:var(--bg,#000);border:1px solid var(--line,#2E2E34)}' +
+    '.x-tc{flex-wrap:wrap}.x-tcr{order:3;flex:1 0 100%;width:100%;max-width:240px;height:40px;margin:2px 0 0;accent-color:#D9A441;touch-action:pan-y;-webkit-appearance:none;appearance:none;background:transparent}' +
+    '.x-tcr::-webkit-slider-runnable-track{height:8px;border-radius:4px;background:var(--line,#3A3A40)}.x-tcr::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;margin-top:-11px;border-radius:50%;background:#D9A441;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5)}' +
+    '.x-tcr::-moz-range-track{height:8px;border-radius:4px;background:var(--line,#3A3A40)}.x-tcr::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:#D9A441;border:3px solid #fff}' +
     '.x-tcs{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:92px}.x-tcv{font:700 24px/1 system-ui,-apple-system,sans-serif}.x-tcl{font:600 10px system-ui,-apple-system,sans-serif;color:var(--muted,#A1A1AA);text-transform:uppercase;letter-spacing:.04em}' +
     '.x-tcf{display:flex;align-items:center;gap:6px}.x-tcf .btn{min-width:36px;min-height:36px;padding:0;font-size:18px}.x-tcf b{min-width:16px;text-align:center}.x-tc0{min-height:30px;padding:2px 8px;font-size:12px}.x-tc0.on{background:var(--cherry,#8B1E1E);border-color:var(--cherry,#8B1E1E);color:#fff}' +
     '.x-par{display:flex;align-items:center;gap:6px;margin-top:6px;font:600 11px system-ui,-apple-system,sans-serif;color:var(--muted,#A1A1AA);text-transform:uppercase;letter-spacing:.04em}.x-par input{width:64px;min-height:34px;color:var(--cherry,#E5484D)}.x-par,.x-par b{color:var(--cherry,#E5484D)}.x-par b{font-size:16px}.x-par svg{flex:none}' +
