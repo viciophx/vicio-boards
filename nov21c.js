@@ -13,7 +13,7 @@
       Fountain Sprite (bag-in-box) stays.
    8. Inventory: Soda BIBs & CO2 is its own section, right after the Attic count, instead of a group inside it (Eric).
       Counts are saved by item, so nothing already counted is lost; it has its own Submit. The bag-in-box sodas Vicio carries:
-      Coke, Sprite, Dr Pepper, Energy drink, Lemonade, Coke Zero (Eric). Cranberry juice is off the list. */
+      Coke, Sprite, Dr Pepper, Energy drink, Lemonade, Coke Zero and Cranberry (Eric). */
 (function () {
   if (window.__vicioNov21c || window.VICIO_BOARD !== 'foh') return;
   window.__vicioNov21c = true;
@@ -72,7 +72,6 @@
       var at = COUNTFORMS[ai], gi = at.groups.findIndex(function (g) { return /co2|soda/i.test(g[0]) && g[1].some(function (it) { return /^a_bib|^a_co2/.test(it[0]); }); });
       if (gi < 0) return;
       var grp = at.groups.splice(gi, 1)[0];
-      grp[1] = grp[1].filter(function (it) { return it[0] !== 'a_bibcran'; });
       at.desc = 'Paper goods and cleaning. Soda BIBs and CO2 have their own count below. The freezer is the kitchen\'s count. Partials in tenths, 0.1 to 0.9.';
       COUNTFORMS.splice(ai + 1, 0, { id: 'inv_bib', name: 'Soda BIBs & CO2', desc: 'Bag-in-box sodas and the CO2 tanks. Lift each box to judge partials, in tenths, 0.1 to 0.9. Count full spare CO2 tanks.', groups: [['Bag-in-box and CO2', grp[1]]] });
       if (typeof FORMS !== 'undefined') { var fi = FORMS.findIndex(function (f) { return f[0] === 'inv_attic'; }); FORMS.splice(fi + 1, 0, ['inv_bib', 'Soda BIBs & CO2']); }
