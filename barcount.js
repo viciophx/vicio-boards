@@ -33,7 +33,11 @@
    Slide to set the level (Eric): picking a point with a tap was hard on the iPad and phone, so the open bottle now slides.
    Drag up or down on the bottle and the liquid follows your finger, or use the slider under it (0 to 1 in tenths); the
    number updates as you move and saves when you let go. A plain tap still sets that level, and a quick double tap still
-   clears the line. */
+   clears the line.
+   Each bottle's own shape (Eric): where the shared sheet has an outline for the bottle (bottleart, loaded by bottlepics.js
+   into window.__VICIO_ART), the level is drawn inside that bottle's real silhouette instead of the generic bottle, and the
+   liquid rises from the bottom to the shoulder (the top 22% of the outline is the neck and cap, which a full bottle never
+   reaches on the count). */
 (function () {
   if (window.__vicioBarCount || window.VICIO_BOARD !== 'foh') return;
   window.__vicioBarCount = true;
@@ -69,6 +73,12 @@
       '<path d="M22 4h12v16c0 6 10 8 10 18v84a6 6 0 0 1-6 6H18a6 6 0 0 1-6-6V38c0-10 10-12 10-18z" fill="none" stroke="currentColor" stroke-width="1.6"/>' + ticks +
       '<text x="50" y="' + (BB - (BB - BT) * 0.5 + 3) + '" font-size="8" fill="currentColor" opacity=".7" text-anchor="end">.5</text><text x="50" y="' + (BT + 3) + '" font-size="8" fill="currentColor" opacity=".7" text-anchor="end">1</text></svg>';
   }
+  var NECK = 0.22;
+  function art(id) { return (window.__VICIO_ART || {})[id] || {}; }
+  function shape(id, frac) {
+    var o = art(id).out; if (!o) return bottleSvg(frac);
+    return '<div class="x-shp"><img class="x-shpo" src="' + o + '" alt=""><div class="x-shpl" style="-webkit-mask-image:url(' + o + ');mask-image:url(' + o + ')"><div class="x-shpf" style="height:' + (frac * (1 - NECK) * 100).toFixed(1) + '%"></div></div></div>';
+  }
   function split(v) {
     if (v == null || v === '' || isNaN(+v)) return { full: 0, frac: 0, none: true };
     v = Math.round(+v * 10) / 10; var full = Math.floor(v + 1e-9), frac = Math.round((v - full) * 10) / 10;
@@ -82,7 +92,7 @@
       var grp = inp.closest('[data-fold^="inv_"]'); if (grp && /beer/i.test(grp.dataset.fold)) return;
       var id = inp.dataset.inv, sp = split(c[id]), cell = inp.closest('td'); if (!cell) return;
       var total = sp.none ? '\u2013' : (sp.full + sp.frac).toFixed(1).replace(/\.0$/, '');
-      cell.innerHTML = '<div class="x-tc"><div class="x-tcb" data-tcid="' + id + '" role="slider" aria-label="Open bottle level" aria-valuemin="0" aria-valuemax="1" aria-valuenow="' + sp.frac + '">' + bottleSvg(sp.frac) + '</div>' +
+      cell.innerHTML = '<div class="x-tc"><div class="x-tcb' + (art(id).out ? ' x-tcbs' : '') + '" data-tcid="' + id + '" role="slider" aria-label="Open bottle level" aria-valuemin="0" aria-valuemax="1" aria-valuenow="' + sp.frac + '">' + shape(id, sp.frac) + '</div>' +
         '<input type="range" class="x-tcr" min="0" max="10" step="1" value="' + Math.round(sp.frac * 10) + '" data-tcr="' + id + '" aria-label="Open bottle level, tenths">' +
         '<div class="x-tcs"><b class="x-tcv">' + total + '</b><span class="x-tcl">Full backups</span><span class="x-tcf"><button type="button" class="btn" data-tcfull="-1" data-tcid2="' + id + '" aria-label="One fewer full bottle">\u2212</button><b>' + sp.full + '</b><button type="button" class="btn" data-tcfull="1" data-tcid2="' + id + '" aria-label="One more full bottle">+</button></span><button type="button" class="btn x-tc0' + (c[id] === 0 ? ' on' : '') + '" data-tczero="' + id + '">None left</button></div></div>';
       var th = cell.closest('table') && cell.closest('table').querySelector('thead th:last-child'); if (th && /^Count/.test(th.textContent)) th.textContent = 'Tap the level';
@@ -249,13 +259,15 @@
     }
   }, true);
   function lvlAt(b, clientY) {
+    var sh = b.querySelector('.x-shp');
+    if (sh) { var q = sh.getBoundingClientRect(); return Math.max(1, Math.min(10, Math.ceil((q.bottom - clientY) / (q.height * (1 - NECK)) * 10 - 0.0001))) / 10; }
     var svg = b.querySelector('svg'), r = svg.getBoundingClientRect(), y = (clientY - r.top) * BH / r.height;
     return Math.max(1, Math.min(10, Math.ceil((BB - y) / (BB - BT) * 10 - 0.0001))) / 10;
   }
   function preview(id, frac) {
     var b = document.querySelector('[data-tcid="' + id + '"]'); if (!b) return;
     var sp = split((S.inv && S.inv.c || {})[id]), wrap = b.closest('.x-tc');
-    b.innerHTML = bottleSvg(frac);
+    var f = b.querySelector('.x-shpf'); if (f) f.style.height = (frac * (1 - NECK) * 100).toFixed(1) + '%'; else b.innerHTML = bottleSvg(frac);
     var v = wrap && wrap.querySelector('.x-tcv'); if (v) v.textContent = (sp.full + frac).toFixed(1).replace(/\.0$/, '');
     var r = wrap && wrap.querySelector('.x-tcr'); if (r && +r.value !== Math.round(frac * 10)) r.value = Math.round(frac * 10);
   }
@@ -292,6 +304,7 @@
   }, true);
   (function () { var st = document.createElement('style'); st.textContent =
     '.x-tc{display:flex;align-items:center;gap:10px;justify-content:flex-end}.x-tcb{cursor:ns-resize;color:var(--ink,#EDEDF0);touch-action:none;user-select:none;-webkit-user-select:none;border-radius:10px;padding:2px 4px;background:var(--bg,#000);border:1px solid var(--line,#2E2E34)}' +
+    '.x-tcb.x-tcbs{border:0;background:none;padding:0}.x-shp{position:relative;height:132px;display:inline-block}.x-shpo{display:block;height:132px;width:auto}.x-shpl{position:absolute;inset:0;-webkit-mask-size:100% 100%;mask-size:100% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;pointer-events:none}.x-shpf{position:absolute;left:0;right:0;bottom:0;background:#D9A441;opacity:.92}' +
     '.x-tc{flex-wrap:wrap}.x-tcr{order:3;flex:1 0 100%;width:100%;max-width:240px;height:40px;margin:2px 0 0;accent-color:#D9A441;touch-action:pan-y;-webkit-appearance:none;appearance:none;background:transparent}' +
     '.x-tcr::-webkit-slider-runnable-track{height:8px;border-radius:4px;background:var(--line,#3A3A40)}.x-tcr::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;margin-top:-11px;border-radius:50%;background:#D9A441;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5)}' +
     '.x-tcr::-moz-range-track{height:8px;border-radius:4px;background:var(--line,#3A3A40)}.x-tcr::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:#D9A441;border:3px solid #fff}' +
