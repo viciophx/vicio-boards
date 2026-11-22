@@ -2,7 +2,10 @@
    config.js; FOH only. Eric wanted the brands' own product shots, not his shelf photos. The board doesn't copy them: each
    one loads straight from where it's published (the brand's site where it had a clean shot, otherwise a liquor store's
    listing of the same bottle). If a picture ever stops loading, its spot is simply left empty. Tapping a photo opens the
-   bottle's profile, and the photo shows at the top of the profile too. Wine, beer and the house batches have no photo. */
+   bottle's profile, and the photo shows at the top of the profile too. Wine, beer and the house batches have no photo.
+   Soda BIBs & CO2 (Eric): each bag-in-box line shows its brand's logo next to the name, loaded by link the same way. Logos
+   are in for Coke, Sprite, Coke Zero and Dr Pepper; Lemonade, Energy drink, Cranberry and Tonic wait for Eric to say
+   which brand each one is. */
 (function () {
   if (window.__vicioBottlePics || window.VICIO_BOARD !== 'foh') return;
   window.__vicioBottlePics = true;
@@ -58,6 +61,20 @@
   };
   Object.keys(PICS).forEach(function (k) { PICS[k] = 'https://' + PICS[k]; });
   function img(cls, id) { return '<img class="' + cls + '" src="' + PICS[id] + '" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.style.visibility=\'hidden\'"' + (cls === 'x-bpic' ? ' data-binfo="' + id + '" title="About this bottle"' : '') + '>'; }
+  var LOGOS = {
+    a_bibcoke: 'upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Coca-Cola_logo.svg/250px-Coca-Cola_logo.svg.png',
+    a_bibsprite: 'upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Sprite_2022.svg/250px-Sprite_2022.svg.png',
+    a_bibzero: 'upload.wikimedia.org/wikipedia/commons/thumb/5/54/Coca-Cola_Zero_Sugar_Logo_%282%29.png/250px-Coca-Cola_Zero_Sugar_Logo_%282%29.png',
+    a_bibdrp: 'assets.stickpng.com/images/61fa8a9ceec4c40004bacd42.png'
+  };
+  function logos() {
+    var sec = document.querySelector('[data-fold="sec_inv_bib"]'); if (!sec) return;
+    Array.prototype.forEach.call(sec.querySelectorAll('[data-lvid],input[data-inv]'), function (el) {
+      var id = el.dataset.lvid || el.dataset.inv, row = el.closest('tr'); if (!LOGOS[id] || !row || row.querySelector('.x-blogo')) return;
+      var cell = row.cells[0]; if (!cell) return;
+      cell.insertAdjacentHTML('afterbegin', '<img class="x-blogo" src="https://' + LOGOS[id] + '" alt="" referrerpolicy="no-referrer" onerror="this.remove()">');
+    });
+  }
   function pics() {
     var sec = document.querySelector('[data-fold="sec_bar"]'); if (!sec) return;
     Array.prototype.forEach.call(sec.querySelectorAll('.x-tcb[data-tcid]'), function (b) {
@@ -76,11 +93,12 @@
   }, true);
   var st = document.createElement('style');
   st.textContent = '.x-bpic{height:112px;width:76px;object-fit:contain;border-radius:8px;cursor:pointer;flex:none;background:#fff;padding:3px;box-sizing:border-box}' +
+    '.x-blogo{display:block;height:30px;width:auto;max-width:110px;object-fit:contain;background:#fff;border-radius:6px;padding:3px 6px;margin:0 0 6px}' +
     '.x-bp-pic{float:right;height:150px;width:110px;object-fit:contain;margin:28px 0 8px 12px;border-radius:10px;background:#fff;padding:4px;box-sizing:border-box}';
   document.head.appendChild(st);
   (function start() {
     if (typeof render !== 'function' || typeof ui === 'undefined' || !document.getElementById('view')) return setTimeout(start, 200);
-    var r0 = render; render = function () { var out = r0.apply(this, arguments); setTimeout(function () { try { pics(); } catch (e) {} }, 0); return out; };
-    setTimeout(function () { try { pics(); } catch (e) {} }, 0);
+    var r0 = render; render = function () { var out = r0.apply(this, arguments); setTimeout(function () { try { pics(); } catch (e) {} try { logos(); } catch (e) {} }, 0); return out; };
+    setTimeout(function () { try { pics(); } catch (e) {} try { logos(); } catch (e) {} }, 0);
   })();
 })();
