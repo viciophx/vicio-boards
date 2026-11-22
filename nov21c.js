@@ -18,7 +18,9 @@
       1, 0.75, 0.5, 0.25 or 0 in the same place a count goes, and anything on Need to order is listed at the top.
       The buttons are icons: a box filled to the level, and a cart for Need to order (Eric).
   10. Soda products come from Swire now (Eric): the BIB section says so, and the Coke line no longer says Pope Lime.
-  11. N/A count: the Sodas and energy group is gone, since sodas have their own section (Eric). Dasani added to Water. */
+  11. N/A count: the Sodas and energy group is gone, since sodas have their own section (Eric). Dasani added to Water.
+      Mexican Coke and Jarritos Grapefruit are still sold at $5 (Eric), so they are back on the N/A count under Bottled
+      sodas, with the same item ids as before so past counts line up. */
 (function () {
   if (window.__vicioNov21c || window.VICIO_BOARD !== 'foh') return;
   window.__vicioNov21c = true;
@@ -128,9 +130,12 @@
       if (typeof NABEV !== 'undefined') {
         for (var g = NABEV.length - 1; g >= 0; g--) if (/^sodas/i.test(NABEV[g][0])) NABEV.splice(g, 1);
         var w = NABEV.find(function (x) { return /^water/i.test(x[0]); }); if (w && w[1].indexOf('Dasani') < 0) w[1].push('Dasani');
+        var wi0 = NABEV.findIndex(function (x) { return /^water/i.test(x[0]); }); NABEV.splice(wi0 < 0 ? NABEV.length : wi0, 0, ['Bottled sodas', ['Mexican Coke', 'Jarritos Grapefruit']]);
       }
       if (typeof NAITEMS !== 'undefined') {
         for (var n = NAITEMS.length - 1; n >= 0; n--) if (/^sodas/i.test(NAITEMS[n][2] || '')) NAITEMS.splice(n, 1);
+        var fw = NAITEMS.findIndex(function (i) { return /^water/i.test(i[2] || ''); }), sg = typeof slug === 'function' ? slug : function (x) { return x.toLowerCase().replace(/[^a-z0-9]+/g, '_'); };
+        NAITEMS.splice(fw < 0 ? NAITEMS.length : fw, 0, [sg('Mexican Coke'), 'Mexican Coke', 'Bottled sodas'], [sg('Jarritos Grapefruit'), 'Jarritos Grapefruit', 'Bottled sodas']);
         if (!NAITEMS.some(function (i) { return i[1] === 'Dasani'; })) { var wi = -1; NAITEMS.forEach(function (i, k) { if (/^water/i.test(i[2] || '')) wi = k; }); var sl = typeof slug === 'function' ? slug('Dasani') : 'dasani'; NAITEMS.splice(wi < 0 ? NAITEMS.length : wi + 1, 0, [sl, 'Dasani', 'Water']); }
       }
       dropItems.na3 = true;
