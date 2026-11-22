@@ -16,7 +16,9 @@
    line and listed at the top of the bar count to recheck. One tap says a delivery came, or that the count is right, and the
    flag clears for that week (saved with the count as ok.<id>). Beer and house batches are not flagged this way.
    Batches (Eric): a house batch counted under half shows Make more, is listed at the top, and links to the drink's spec
-   where there is one. */
+   where there is one.
+   Par is red and locked (Eric): on the iPads the par under each name is a red number with a small lock and nobody can
+   change it there; managers change pars on Colette's Board, where the box stays editable. */
 (function () {
   if (window.__vicioBarCount || window.VICIO_BOARD !== 'foh') return;
   window.__vicioBarCount = true;
@@ -70,6 +72,7 @@
       var th = cell.closest('table') && cell.closest('table').querySelector('thead th:last-child'); if (th && /^Count/.test(th.textContent)) th.textContent = 'Tap the level';
     });
   }
+  var IN_COLETTE = false; try { IN_COLETTE = !!(window.parent && window.parent !== window); } catch (e) { IN_COLETTE = true; }
   function relayout() {
     var sec = document.querySelector('[data-fold="sec_bar"]'); if (!sec) return;
     Array.prototype.forEach.call(sec.querySelectorAll('[data-fold^="inv_"] table'), function (t) {
@@ -81,6 +84,9 @@
         var c = r.cells, name = c[0], last = c[1], par = c[2], need = c[3], cnt = c[4];
         var pw = document.createElement('div'); pw.className = 'x-par'; pw.innerHTML = '<span>Par</span>';
         while (par.firstChild) pw.appendChild(par.firstChild);
+        var inp = pw.querySelector('input');
+        if (inp && !IN_COLETTE) { var tx = document.createElement('b'); tx.textContent = inp.value === '' ? '\u2013' : inp.value; inp.replaceWith(tx); }
+        pw.insertAdjacentHTML('beforeend', IN_COLETTE && inp ? '' : '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>');
         name.appendChild(pw); par.remove();
         r.insertBefore(cnt, last); cnt.classList.add('x-cnt');
       });
@@ -179,7 +185,7 @@
     '.x-tc{display:flex;align-items:center;gap:10px;justify-content:flex-end}.x-tcb{cursor:pointer;color:var(--ink,#EDEDF0);touch-action:manipulation;border-radius:10px;padding:2px 4px;background:var(--bg,#000);border:1px solid var(--line,#2E2E34)}' +
     '.x-tcs{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:92px}.x-tcv{font:700 24px/1 system-ui,-apple-system,sans-serif}.x-tcl{font:600 10px system-ui,-apple-system,sans-serif;color:var(--muted,#A1A1AA);text-transform:uppercase;letter-spacing:.04em}' +
     '.x-tcf{display:flex;align-items:center;gap:6px}.x-tcf .btn{min-width:36px;min-height:36px;padding:0;font-size:18px}.x-tcf b{min-width:16px;text-align:center}.x-tc0{min-height:30px;padding:2px 8px;font-size:12px}.x-tc0.on{background:var(--cherry,#8B1E1E);border-color:var(--cherry,#8B1E1E);color:#fff}' +
-    '.x-par{display:flex;align-items:center;gap:6px;margin-top:6px;font:600 11px system-ui,-apple-system,sans-serif;color:var(--muted,#A1A1AA);text-transform:uppercase;letter-spacing:.04em}.x-par input{width:64px;min-height:34px}' +
+    '.x-par{display:flex;align-items:center;gap:6px;margin-top:6px;font:600 11px system-ui,-apple-system,sans-serif;color:var(--muted,#A1A1AA);text-transform:uppercase;letter-spacing:.04em}.x-par input{width:64px;min-height:34px;color:var(--cherry,#E5484D)}.x-par,.x-par b{color:var(--cherry,#E5484D)}.x-par b{font-size:16px}.x-par svg{flex:none}' +
     '[data-fold="sec_bar"] td.x-cnt{text-align:left}[data-fold="sec_bar"] .x-tc{justify-content:flex-start}.x-flag{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:6px}.x-fbtn{min-height:30px;padding:2px 10px;font-size:12px}.x-fnote{font-size:12px;color:var(--muted,#A1A1AA)}.x-need{margin:4px 0 8px;font-weight:600}'; document.head.appendChild(st); })();
 
   (function start() {
