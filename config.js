@@ -11,3 +11,5 @@ try { var n21c = document.createElement('script'); n21c.src = 'nov21c.js?v=' + D
 try { var bc = document.createElement('script'); bc.src = 'barcount.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(bc); } catch (e) {}
 /* Kitchen pars locked on the iPads (parlock.js, Nov 21 2026): only Colette's Board can change them. Kitchen only. */
 try { var pl = document.createElement('script'); pl.src = 'parlock.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(pl); } catch (e) {}
+/* Tap a bottle's name on the bar count for its profile (bottleinfo.js, Nov 22 2026). FOH only. */
+try { var bi = document.createElement('script'); bi.src = 'bottleinfo.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(bi); } catch (e) {}
