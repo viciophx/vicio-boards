@@ -7,3 +7,5 @@ try { var n21 = document.createElement('script'); n21.src = 'nov21.js?v=' + Date
 try { var ri = document.createElement('script'); ri.src = 'runicons.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(ri); } catch (e) {}
 /* More Nov 21 changes (nov21c.js): Inside map shorter again, B6 and the DJ by the bar, the three to-go boxes on the attic count. */
 try { var n21c = document.createElement('script'); n21c.src = 'nov21c.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(n21c); } catch (e) {}
+/* The new bar count (barcount.js, Nov 21 2026): top shelf, shelf 2 and the speed rail, in shelf order. FOH only. */
+try { var bc = document.createElement('script'); bc.src = 'barcount.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(bc); } catch (e) {}
