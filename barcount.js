@@ -9,7 +9,9 @@
    bottle at .6 is 2.6). Tap the same point again to clear the open bottle. None left marks it 0. Beer stays a number box.
    Surfside is gone (Eric): off the bar count (the beer group is now just Beers), off the Drinks page, and out of the beer quiz.
    Layout (Eric): the par sits under each bottle's name, and the tap-the-level bottle (or the number box, for beer) is right
-   next to the name. Last week and the order amount follow. */
+   next to the name. Last week and the order amount follow.
+   Pars, once (Eric): every bar count line gets a par of 1, except the speed rail, which gets 2. Saved to the shared bar
+   settings with a par1121 mark so it never runs twice; managers can still change any par after. */
 (function () {
   if (window.__vicioBarCount || window.VICIO_BOARD !== 'foh') return;
   window.__vicioBarCount = true;
@@ -79,6 +81,22 @@
       });
     });
   }
+  function setPars() {
+    if (setPars.done) return;
+    var d0 = (typeof db !== 'undefined') ? db : null;
+    function go(d) {
+      if (setPars.done) return; setPars.done = true;
+      if (d && d.par1121) return;
+      var p = {}, at = Date.now();
+      INVITEMS.forEach(function (i) { p[i[0]] = /speed rail/i.test(i[2] || '') ? 2 : 1; });
+      S.barcfg = Object.assign({}, S.barcfg, { par: Object.assign({}, (S.barcfg || {}).par, p), par1121: at });
+      save('config/bar', { par: p, par1121: at }); render();
+    }
+    if (d0 && d0.doc) {
+      setPars.waiting = true;
+      var un = d0.doc('config/bar').onSnapshot(function (s) { setTimeout(function () { try { un && un(); } catch (e) {} }, 0); go(s && s.exists ? s.data() : {}); }, function () {});
+    } else if (S.barcfg && Object.keys(S.barcfg).length) go(S.barcfg);
+  }
   function setVal(id, v) {
     if (v != null) v = Math.round(v * 10) / 10;
     S.inv = Object.assign({}, S.inv, { c: Object.assign({}, (S.inv || {}).c, (function () { var o = {}; o[id] = v; return o; })()) });
@@ -116,6 +134,7 @@
 
   (function start() {
     if (!apply() || typeof render !== 'function') return setTimeout(start, 200);
+    setTimeout(function () { try { setPars(); } catch (e) {} }, 4000);
     var r0 = render; render = function () { var out = r0.apply(this, arguments); try { tapCount(); } catch (e) {} try { relayout(); } catch (e) {} return out; };
     render();
   })();
