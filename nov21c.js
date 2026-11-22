@@ -4,7 +4,8 @@
       drawn, so it runs on the Reservations page with Inside showing. The layout from before is kept in
       seating/layout_before_1121d.
    3. Attic inventory count: the one "Folding to-go boxes" line is now the three boxes Vicio carries: pizza boxes, large
-      to-go boxes and small to-go boxes. */
+      to-go boxes and small to-go boxes.
+   4. Beer cooler count: Negra Modelo removed (Eric). Counts already saved for it stay in the record. */
 (function () {
   if (window.__vicioNov21c || window.VICIO_BOARD !== 'foh') return;
   window.__vicioNov21c = true;
@@ -56,9 +57,17 @@
       if (typeof ES !== 'undefined') { ES['Pizza boxes'] = 'Cajas de pizza'; ES['To-go boxes, large'] = 'Cajas para llevar, grandes'; ES['To-go boxes, small'] = 'Cajas para llevar, chicas'; ES['bundles'] = ES['bundles'] || 'paquetes'; }
     } catch (e) {}
   }
+  function dropItems() {
+    try {
+      if (typeof COUNTFORMS === 'undefined' || dropItems.done) return;
+      COUNTFORMS.forEach(function (f) { (f.groups || []).forEach(function (g) {
+        var i = g[1].findIndex(function (it) { return it[0] === 'b_negramodelo'; }); if (i >= 0) { g[1].splice(i, 1); dropItems.done = true; }
+      }); });
+    } catch (e) {}
+  }
   (function start() {
     if (typeof render !== 'function' || typeof ui === 'undefined' || !document.getElementById('view')) return setTimeout(start, 200);
-    togoBoxes();
+    togoBoxes(); dropItems();
     var r0 = render;
     render = function () { var out = r0.apply(this, arguments); setTimeout(function () { try { shorter(); } catch (e) {} try { fixLayout1121d(); } catch (e) {} }, 30); return out; };
     render();
