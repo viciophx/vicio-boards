@@ -16,7 +16,8 @@
       Coke, Sprite, Dr Pepper, Energy drink, Lemonade, Coke Zero, Cranberry and Tonic (Eric).
    9. Soda BIBs & CO2 is rated, not counted (Eric): each line is 100%, 75%, 50%, 25% or Need to order, one tap. Saved as
       1, 0.75, 0.5, 0.25 or 0 in the same place a count goes, and anything on Need to order is listed at the top.
-      The buttons are icons: a box filled to the level, and a cart for Need to order (Eric).
+      The buttons are icons: a box filled to the level, and a cart for Need to order (Eric). The CO2 line stays a count of full
+      spare tanks (Eric).
   10. Soda products come from Swire now (Eric): the BIB section says so, and the Coke line no longer says Pope Lime.
   11. N/A count: the Sodas and energy group is gone, since sodas have their own section (Eric). Dasani added to Water.
       Mexican Coke and Jarritos Grapefruit are still sold at $5 (Eric), so they are back on the N/A count under Bottled
@@ -154,14 +155,15 @@
     var c = (S.inv && S.inv.c) || {}, need = [];
     A.forEach.call(sec.querySelectorAll('input[data-inv]'), function (inp) {
       var id = inp.dataset.inv, v = c[id], cell = inp.closest('td'), row = inp.closest('tr');
+      if (/^a_co2/.test(id)) return;
       if (v === 0) need.push((row && row.cells[0] ? row.cells[0].textContent : id).replace(/^Bag-in-box:\s*/, '').replace(/Lift to judge partials/, '').trim());
       cell.innerHTML = '<div class="x-lv" role="group" aria-label="Level">' + LV.map(function (l) {
         return '<button type="button" class="x-lvb' + (l[0] === 0 ? ' need' : '') + (v != null && v !== '' && +v === l[0] ? ' on' : '') + '" data-lv="' + l[0] + '" data-lvid="' + id + '" aria-label="' + l[1] + '" title="' + l[1] + '">' + lvIcon(l[0]) + '<small>' + (l[0] === 0 ? 'Order' : l[1]) + '</small></button>';
       }).join('') + '</div>';
       if (row && row.cells[2] && /^[\d.]+$/.test(row.cells[2].textContent.trim())) row.cells[2].textContent = lvLabel(row.cells[2].textContent.trim());
     });
-    A.forEach.call(sec.querySelectorAll('thead th'), function (th) { if (th.textContent.trim() === 'Count') th.textContent = 'Level'; });
-    var p = sec.querySelector('p.muted'); if (p) p.textContent = 'Tap the level of each bag-in-box and the CO2. Sodas are ordered from Swire.';
+    A.forEach.call(sec.querySelectorAll('thead th'), function (th) { if (th.textContent.trim() === 'Count') th.textContent = 'Level or count'; });
+    var p = sec.querySelector('p.muted'); if (p) p.textContent = 'Tap the level of each bag-in-box, and count the full spare CO2 tanks. Sodas are ordered from Swire.';
     if (need.length && p) p.insertAdjacentHTML('afterend', '<p class="x-need"><span class="pill warn">Need to order</span> ' + need.join(', ') + '</p>');
   }
   document.addEventListener('click', function (e) {
