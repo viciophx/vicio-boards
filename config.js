@@ -17,3 +17,5 @@ try { var bi = document.createElement('script'); bi.src = 'bottleinfo.js?v=' + D
 try { var bp = document.createElement('script'); bp.src = 'bottlepics.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(bp); } catch (e) {}
 /* Attic count by case and by piece, cleaning set apart (atticcount.js, Nov 22 2026). FOH only. */
 try { var ac = document.createElement('script'); ac.src = 'atticcount.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(ac); } catch (e) {}
+/* Soda BIBs: next order day, order list, CO2, expiration dates (bib.js, Nov 22 2026). FOH only. */
+try { var bb = document.createElement('script'); bb.src = 'bib.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(bb); } catch (e) {}
