@@ -1,20 +1,68 @@
-/* Vicio FOH: a photo of each bottle beside the tap-the-level bottle on the bar count (Eric, Nov 22 2026). Loaded by config.js;
-   FOH only. The photos are cut from Eric's shelf photos (black and white, because the back bar is lit red). They live in the
-   shared sheet (bottlepics/<line id> = { src }), put there by Colette's Board, so this file stays small; inside Colette's
-   Board they come built in. Tapping a photo opens the bottle's profile, and the photo shows at the top of the profile too.
-   Bottles without a photo yet: Nolet's, Evan Williams, Tito's, the three De Kuyper liqueurs, Potter's Triple Sec, Malibu and
-   Bacardi, plus wine, beer and the house batches. */
+/* Vicio FOH: a product photo of each bottle beside the tap-the-level bottle on the bar count (Eric, Nov 22 2026). Loaded by
+   config.js; FOH only. Eric wanted the brands' own product shots, not his shelf photos. The board doesn't copy them: each
+   one loads straight from where it's published (the brand's site where it had a clean shot, otherwise a liquor store's
+   listing of the same bottle). If a picture ever stops loading, its spot is simply left empty. Tapping a photo opens the
+   bottle's profile, and the photo shows at the top of the profile too. Wine, beer and the house batches have no photo. */
 (function () {
   if (window.__vicioBottlePics || window.VICIO_BOARD !== 'foh') return;
   window.__vicioBottlePics = true;
-  var PICS = {};
-  if (window.__VICIO_PICS) Object.keys(window.__VICIO_PICS).forEach(function (k) { PICS[k] = window.__VICIO_PICS[k]; });
+  var PICS = {
+    '1800_blanco': 'images.tcdn.com.br/img/img_prod/774261/tequila_1800_blanco_750ml_774_1_5e4b31054e6514350a610fd996db002e.jpg',
+    agavales_spicy_tamarindo: 'cdn.hy-vee.com/products/00810095915505/CF/416271be-acd8-4bca-b0ee-2b7ec93fcfd1_large.jpg',
+    amara_s: 'www.vinasa.mx/wp-content/uploads/2023/12/Mezcal-Joven-Amaras-Espadin-Blanco-750ml.png',
+    aperol: 'www.aperol.com/app/uploads/2023/04/aperol-tasting-notes-product.jpg',
+    bacardi: 'd323g1xugy1rkz.cloudfront.net/wp-content/uploads/sites/25/2020/10/21134822/Products-Bottle-Superior-min-1.png',
+    belvedere: 'cashandcarryalcohol.s3.amazonaws.com/webp-product-images/22.webp',
+    bulleit_95_rye: 'cdn.shopify.com/s/files/1/0020/3164/8827/products/BulleitRye750ml.png',
+    bulleit_bourbon: 'qualityliquorstore.com/cdn/shop/files/bulleit-bourbon-1-75-liter-84263-_1.jpg',
+    camazotz_oaxacan_rum: 'sf.flatiron-wines.com/cdn/shop/products/Bottle-of-Camazotz-Oaxacan-Rum-Spirits-Flatiron-SF.jpg',
+    campari: 'aem.lcbo.com/content/dam/lcbo/products/2/7/7/9/277954.jpg.thumb.1280.1280.jpg',
+    captain_morgan: 'cdn.shopify.com/s/files/1/0050/2395/7103/products/CaptainMorganSpiced_1400x.jpg',
+    casamigos_reposado: 'images.ctfassets.net/hpoa7h16o9wc/5mMHSwJ5VtvDYh5aJJSPEE/bb8d20d097993903c2b2e5c69026a0f2/ReposadoMobile.jpg',
+    crown_royal: 'sklep-domwhisky.pl/hpeciai/ac2fa4fa9081bfe61a1ea583fd46e0d5/eng_pl_Crown-Royal-Fine-De-Luxe-40-1-0l-32612_1.jpg',
+    de_kuyper_blue_curac_ao: 'bottle-stop.com.au/cdn/shop/files/buy-dekuyper-blue-curacao-liqueur-500ml-online-spirits-dekuyper-store-alcohol-delivery-bottleshop_near_me-liquor_marketplace-bottle_stop-formerly_boozebud.webp',
+    de_kuyper_peachtree: 'creekvillespirits.com/cdn/shop/products/Bottle_Template_8_1bb039c2-908a-4ffd-b3c4-220dab3a398c_530x@2x.png',
+    de_kuyper_watermelon: 'theliquorbarn.com/cdn/shop/files/Dekuyper-Watermelon-Pucker-750ML__89738.jpg',
+    evan_williams: 'caravanwinesandspirits.com.au/cdn/shop/products/evan-williams-black-label-bourbon-3205555.jpg',
+    fireball: 'topshelfwineandspirits.com/cdn/shop/products/ScreenShot2021-10-07at11.08.21AM.jpg',
+    g4_blanco: 'sf.flatiron-wines.com/cdn/shop/files/Bottle-of-G4-Tequila-Blanco-High-Proof-108-Spirits-Flatiron-SF.jpg',
+    g4_reposado: 'sf.flatiron-wines.com/cdn/shop/products/Bottle-of-G4-Tequila-Reposado-Spirits-Flatiron-SF.png',
+    hennessy: 'www.totalwine.com/dynamic/x1000,sq/images/581750/581750-1-fr.png',
+    hibiki: 'i5.walmartimages.com/seo/Hibiki-Suntory-Whisky-Japanese-Harmony-750-ml-Bottle-ABV-43-0_f0480b8f-8fba-498c-b4e8-9196ff85c758.a2bdc8970658c2c2b056a0faba8fc620.jpeg',
+    jack_daniel_s: 'media.danmurphys.com.au/dmo/product/27390-1.png',
+    jameson: 'winesellersdirect.com.au/cdn/shop/files/jameson-irish-whiskey-1000ml.png',
+    johnnie_walker_black: 'img.thewhiskyexchange.com/900/blend_joh107.jpg',
+    johnnie_walker_red: 'liberationqualitydrinks.gg/cdn/shop/products/johnniewalkerredlabel_1024x.jpg',
+    jose_cuervo_gold: 'bottlebarn.com/cdn/shop/products/JoseCuervoEspecialGoldTequila750ml.png',
+    jose_cuervo_silver: 'bottlebarn.com/cdn/shop/products/JoseCuervoEspecialSilverTequila750ml_800x.png',
+    la_vieja_taberna: 'www.winetodeliver.com/cdn/shop/products/veija.jpg',
+    lost_lore_blanco: 'elcerritoliquor.com/cdn/shop/files/8D001846-74F2-42A0-9C05-F9B44B3094CA.png',
+    maker_s_mark: 'zyn.ca/cdn/shop/files/Maker_s-Mark---1.14-Litre_5000x.jpg',
+    malibu: 'media.nicks.com.au/products/0916e309/malibu-coconut-and-rum-liqueur-1000ml.jpg',
+    nikka: 'www.bayfields.com.au/wp-content/uploads/Nikka-Whisky-From-The-Barrel-500ml-Bayfields-Liquor-Superstore-500x1000.png',
+    nolet_s_silver: 'bottlebarn.com/cdn/shop/files/Nolet_sDryGin750ml.png',
+    potter_s_triple_sec: 'www.leungyick.com/shop2/image/cache/catalog/th/LIQ01060599-550x550.jpg',
+    rayu_joven: 'cellar.com/cdn/shop/products/178755.jpg',
+    real_del_valle_blanco: 'cdn11.bigcommerce.com/s-u9ww3di/products/10023/images/14459/valle_blanco___14085.1607808083.600.600.png',
+    riablo_sotol_spiced_pineapple: 'cityhive-production-cdn.cityhive.net/product_details/66269b8f9555c43b4f66c9e5/primary_image/large.png',
+    sotol_la_higuera: 'www.ixtete.com/cdn/shop/files/SOTOLLAHIGUERADASYLIRIONWHEELERI.png',
+    suerte_reposado: 'elcerritoliquor.com/cdn/shop/files/Suerte_Reposado_Tequila_750ml.webp',
+    tanqueray: 'images-svetnapojov-cdn.rshop.sk/default/products/217034fffe79816dd1af86ac0a44d4db.png',
+    tequila_ocho_plata: 'unwindbottleshop.com/cdn/shop/files/TequilaOchoPlata750ml.png',
+    terralta_blanco: 'sf.flatiron-wines.com/cdn/shop/files/Bottle-of-Terralta-Tequila-Blanco-Spirits-Flatiron-SF.jpg',
+    the_botanist_gin: 'liquorshed.com.au/cdn/shop/products/The_Botanist_Islay_Dry_Gin_700ml_10600170_1_2048x.jpg',
+    tito_s: 'thebarrel.au/cdn/shop/files/Tito_sHandmadeVodka.png',
+    uruapan_charanda_blanco: 'cdn11.bigcommerce.com/s-k0y7xl9dpv/images/stencil/1280x1280/products/104731/63464/128430_copy__05837.1762192603.jpg',
+    vera_s: 'images.squarespace-cdn.com/content/v1/584a07e6e6f2e113671a2b1a/1579717287415-VJ8KTNSIDPKF591VJ3UB/VERAS_JOVEN_2020_TRANSPARENT.png',
+    wild_turkey_101_rye: 'cdn11.bigcommerce.com/s-taixn69rog/images/stencil/original/products/26549/809725/121922__62954.1637648950.jpg'
+  };
+  Object.keys(PICS).forEach(function (k) { PICS[k] = 'https://' + PICS[k]; });
+  function img(cls, id) { return '<img class="' + cls + '" src="' + PICS[id] + '" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.style.visibility=\'hidden\'"' + (cls === 'x-bpic' ? ' data-binfo="' + id + '" title="About this bottle"' : '') + '>'; }
   function pics() {
     var sec = document.querySelector('[data-fold="sec_bar"]'); if (!sec) return;
     Array.prototype.forEach.call(sec.querySelectorAll('.x-tcb[data-tcid]'), function (b) {
       var id = b.dataset.tcid, wrap = b.parentNode; if (!PICS[id] || !wrap || wrap.querySelector('.x-bpic')) return;
-      var img = document.createElement('img'); img.className = 'x-bpic'; img.src = PICS[id]; img.alt = ''; img.dataset.binfo = id;
-      img.title = 'About this bottle'; wrap.insertBefore(img, b);
+      b.insertAdjacentHTML('beforebegin', img('x-bpic', id));
     });
   }
   document.addEventListener('click', function (e) {
@@ -23,16 +71,15 @@
     setTimeout(function () {
       var h = document.querySelector('#x-bpop h3'); if (!h || h.parentNode.querySelector('.x-bp-pic')) return;
       if (n.tagName === 'IMG') { var nm = document.querySelector('[data-binfo="' + id + '"].x-bname'); if (nm) h.textContent = nm.textContent.trim(); }
-      h.insertAdjacentHTML('beforebegin', '<img class="x-bp-pic" src="' + PICS[id] + '" alt="">');
+      h.insertAdjacentHTML('beforebegin', img('x-bp-pic', id));
     }, 0);
   }, true);
   var st = document.createElement('style');
-  st.textContent = '.x-bpic{height:112px;width:76px;object-fit:contain;border-radius:8px;cursor:pointer;flex:none;background:#000}' +
-    '.x-bp-pic{float:right;height:140px;width:auto;max-width:110px;object-fit:contain;margin:28px 0 8px 12px;border-radius:10px;background:#000}';
+  st.textContent = '.x-bpic{height:112px;width:76px;object-fit:contain;border-radius:8px;cursor:pointer;flex:none;background:#fff;padding:3px;box-sizing:border-box}' +
+    '.x-bp-pic{float:right;height:150px;width:110px;object-fit:contain;margin:28px 0 8px 12px;border-radius:10px;background:#fff;padding:4px;box-sizing:border-box}';
   document.head.appendChild(st);
   (function start() {
     if (typeof render !== 'function' || typeof ui === 'undefined' || !document.getElementById('view')) return setTimeout(start, 200);
-    try { if (typeof watchCol === 'function') watchCol('bottlepics', function (o) { var n = 0; Object.keys(o || {}).forEach(function (k) { var s = o[k] && o[k].src; if (s && /^data:image\//.test(s) && PICS[k] !== s) { PICS[k] = s; n++; } }); if (n) render(); }); } catch (e) {}
     var r0 = render; render = function () { var out = r0.apply(this, arguments); setTimeout(function () { try { pics(); } catch (e) {} }, 0); return out; };
     setTimeout(function () { try { pics(); } catch (e) {} }, 0);
   })();
