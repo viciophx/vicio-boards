@@ -4,8 +4,8 @@
    listing of the same bottle). If a picture ever stops loading, its spot is simply left empty. Tapping a photo opens the
    bottle's profile, and the photo shows at the top of the profile too. Wine, beer and the house batches have no photo.
    Soda BIBs & CO2 (Eric): each bag-in-box line shows its brand's logo next to the name, loaded by link the same way. Logos
-   are in for Coke, Sprite, Coke Zero and Dr Pepper; Lemonade, Energy drink, Cranberry and Tonic wait for Eric to say
-   which brand each one is.
+   are in for Coke, Sprite, Coke Zero, Dr Pepper, Lemonade (Minute Maid), Cranberry (Ocean Spray) and Tonic (Schweppes);
+   the energy drink waits for Eric to say which brand it is.
    Beer cooler (Eric): each beer line shows a photo of the bottle or can, loaded by link the same way. Sonora Negra and
    Sonora Clara have none yet (no clean photo found). */
 (function () {
@@ -67,7 +67,10 @@
     a_bibcoke: 'upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Coca-Cola_logo.svg/250px-Coca-Cola_logo.svg.png',
     a_bibsprite: 'upload.wikimedia.org/wikipedia/commons/thumb/a/ae/Sprite_2022.svg/250px-Sprite_2022.svg.png',
     a_bibzero: 'upload.wikimedia.org/wikipedia/commons/thumb/5/54/Coca-Cola_Zero_Sugar_Logo_%282%29.png/250px-Coca-Cola_Zero_Sugar_Logo_%282%29.png',
-    a_bibdrp: 'assets.stickpng.com/images/61fa8a9ceec4c40004bacd42.png'
+    a_bibdrp: 'assets.stickpng.com/images/61fa8a9ceec4c40004bacd42.png',
+    a_biblem: 'upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Minute_Maid_2023.svg/250px-Minute_Maid_2023.svg.png',
+    a_bibcran: 'upload.wikimedia.org/wikipedia/commons/thumb/6/60/Ocean_Spray_logo.svg/250px-Ocean_Spray_logo.svg.png',
+    a_bibtonic: 'upload.wikimedia.org/wikipedia/commons/thumb/0/09/Schweppes_Logo_2016.png/250px-Schweppes_Logo_2016.png'
   };
   var BEER = {
     b_estrella: 'static.wixstatic.com/media/635b4b_904e483857a541069cb3e86abe5337fa~mv2.png/v1/crop/x_747,y_0,w_2506,h_4000/fill/w_614,h_980,al_c,q_90,usm_0.66_1.00_0.01,enc_avif,quality_auto/144b9ef9b5c90d36fd1d7d3327b16276c72df602.png',
