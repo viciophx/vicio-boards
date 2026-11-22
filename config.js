@@ -15,3 +15,5 @@ try { var pl = document.createElement('script'); pl.src = 'parlock.js?v=' + Date
 try { var bi = document.createElement('script'); bi.src = 'bottleinfo.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(bi); } catch (e) {}
 /* Bottle photos on the bar count (bottlepics.js, Nov 22 2026). FOH only. */
 try { var bp = document.createElement('script'); bp.src = 'bottlepics.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(bp); } catch (e) {}
+/* Attic count by case and by piece, cleaning set apart (atticcount.js, Nov 22 2026). FOH only. */
+try { var ac = document.createElement('script'); ac.src = 'atticcount.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(ac); } catch (e) {}

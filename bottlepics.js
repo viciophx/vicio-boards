@@ -5,7 +5,9 @@
    bottle's profile, and the photo shows at the top of the profile too. Wine, beer and the house batches have no photo.
    Soda BIBs & CO2 (Eric): each bag-in-box line shows its brand's logo next to the name, loaded by link the same way. Logos
    are in for Coke, Sprite, Coke Zero and Dr Pepper; Lemonade, Energy drink, Cranberry and Tonic wait for Eric to say
-   which brand each one is. */
+   which brand each one is.
+   Beer cooler (Eric): each beer line shows a photo of the bottle or can, loaded by link the same way. Sonora Negra and
+   Sonora Clara have none yet (no clean photo found). */
 (function () {
   if (window.__vicioBottlePics || window.VICIO_BOARD !== 'foh') return;
   window.__vicioBottlePics = true;
@@ -67,6 +69,28 @@
     a_bibzero: 'upload.wikimedia.org/wikipedia/commons/thumb/5/54/Coca-Cola_Zero_Sugar_Logo_%282%29.png/250px-Coca-Cola_Zero_Sugar_Logo_%282%29.png',
     a_bibdrp: 'assets.stickpng.com/images/61fa8a9ceec4c40004bacd42.png'
   };
+  var BEER = {
+    b_estrella: 'static.wixstatic.com/media/635b4b_904e483857a541069cb3e86abe5337fa~mv2.png/v1/crop/x_747,y_0,w_2506,h_4000/fill/w_614,h_980,al_c,q_90,usm_0.66_1.00_0.01,enc_avif,quality_auto/144b9ef9b5c90d36fd1d7d3327b16276c72df602.png',
+    b_michelob: 'www.africanandeastern.com/image/cache/catalog/MICHELOB%20ULTRA-800x1065.jpg',
+    b_dosequis: 'www.instacart.com/image-server/1864x1864/www.instacart.com/assets/domains/product-image/file/large_57a0b5ac-5b2e-443d-81e7-d6d6c3a86672.jpg',
+    b_corona: 'media.danmurphys.com.au/dmo/product/357480-1.png',
+    b_cartablanca: 'dsom-imager-prod.shipt.com/db860509-6b56-d954-c60d-88719c07602d/db309d9cf29808717c80016a82d81375.jpeg',
+    b_modelo: 'cdn.shopify.com/s/files/1/0605/9520/8383/files/modelo-especial_0_0_0_0.png',
+    b_churchmusic: 'flagstaffliquor.com/cdn/shop/files/ChurchMusic.png',
+    b_millerhl: 'www.lcbo.com/content/dam/lcbo/products/588921.jpg/jcr:content/renditions/cq5dam.web.1280.1280.jpeg',
+    b_pacifico: 'm.media-amazon.com/images/I/71jIBEhz3UL._AC_SL1500_.jpg',
+    b_tecate: 'i0.wp.com/beverages2u.com/wp-content/uploads/2022/07/tecate-original-beer-can.png',
+    b_tecatelight: 'www.kroger.com/product/images/xlarge/front/0008982690124',
+    b_victoria: 'images.heb.com/is/image/HEBGrocery/001453289-1'
+  };
+  function beers() {
+    var sec = document.querySelector('[data-fold="sec_inv_beer"]'); if (!sec) return;
+    Array.prototype.forEach.call(sec.querySelectorAll('input[data-inv]'), function (el) {
+      var id = el.dataset.inv, row = el.closest('tr'); if (!BEER[id] || !row || row.querySelector('.x-beerpic')) return;
+      var cell = row.cells[0]; if (!cell) return;
+      cell.insertAdjacentHTML('afterbegin', '<img class="x-beerpic" src="https://' + BEER[id] + '" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.remove()">');
+    });
+  }
   function logos() {
     var sec = document.querySelector('[data-fold="sec_inv_bib"]'); if (!sec) return;
     Array.prototype.forEach.call(sec.querySelectorAll('[data-lvid],input[data-inv]'), function (el) {
@@ -93,12 +117,13 @@
   }, true);
   var st = document.createElement('style');
   st.textContent = '.x-bpic{height:112px;width:76px;object-fit:contain;border-radius:8px;cursor:pointer;flex:none;background:#fff;padding:3px;box-sizing:border-box}' +
+    '.x-beerpic{float:left;height:64px;width:40px;object-fit:contain;background:#fff;border-radius:6px;padding:2px;margin:0 10px 0 0}' +
     '.x-blogo{display:block;height:30px;width:auto;max-width:110px;object-fit:contain;background:#fff;border-radius:6px;padding:3px 6px;margin:0 0 6px}' +
     '.x-bp-pic{float:right;height:150px;width:110px;object-fit:contain;margin:28px 0 8px 12px;border-radius:10px;background:#fff;padding:4px;box-sizing:border-box}';
   document.head.appendChild(st);
   (function start() {
     if (typeof render !== 'function' || typeof ui === 'undefined' || !document.getElementById('view')) return setTimeout(start, 200);
-    var r0 = render; render = function () { var out = r0.apply(this, arguments); setTimeout(function () { try { pics(); } catch (e) {} try { logos(); } catch (e) {} }, 0); return out; };
-    setTimeout(function () { try { pics(); } catch (e) {} try { logos(); } catch (e) {} }, 0);
+    var r0 = render; render = function () { var out = r0.apply(this, arguments); setTimeout(function () { try { pics(); } catch (e) {} try { logos(); } catch (e) {} try { beers(); } catch (e) {} }, 0); return out; };
+    setTimeout(function () { try { pics(); } catch (e) {} try { logos(); } catch (e) {} try { beers(); } catch (e) {} }, 0);
   })();
 })();
