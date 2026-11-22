@@ -21,3 +21,5 @@ try { var ac = document.createElement('script'); ac.src = 'atticcount.js?v=' + D
 try { var bb = document.createElement('script'); bb.src = 'bib.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(bb); } catch (e) {}
 /* Kitchen Inventory in two tabs, Prepped (with photos) and Whole product (bohinv.js, Nov 22 2026). Kitchen only. */
 try { var bh = document.createElement('script'); bh.src = 'bohinv.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(bh); } catch (e) {}
+/* Bar and N/A orders in whole bottles, batches left off (orderwhole.js, Nov 22 2026). FOH only. */
+try { var ow = document.createElement('script'); ow.src = 'orderwhole.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(ow); } catch (e) {}
