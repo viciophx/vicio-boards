@@ -33,3 +33,5 @@ try { var e23 = document.createElement('script'); e23.src = 'es23.js?v=' + Date.
 try { var nf = document.createElement('script'); nf.src = 'nightflow.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(nf); } catch (e) {}
 /* Calmer navigation: big buttons by job, a quiet header, a food-only Menu page with search (nav23.js, Nov 23 2026). Both boards. */
 try { var nv = document.createElement('script'); nv.src = 'nav23.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(nv); } catch (e) {}
+/* Navigation, round two: land on your list, what's next, bottom bar on phones, one row, dots, search, logo home (navplus.js, Nov 24 2026). Both boards. */
+try { var np = document.createElement('script'); np.src = 'navplus.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(np); } catch (e) {}
