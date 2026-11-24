@@ -31,3 +31,5 @@ try { var bs = document.createElement('script'); bs.src = 'barsubmit.js?v=' + Da
 try { var e23 = document.createElement('script'); e23.src = 'es23.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(e23); } catch (e) {}
 /* The night on the clock: sign-in gate, due times, solo list, closing handoff (nightflow.js, Nov 23 2026). FOH only. */
 try { var nf = document.createElement('script'); nf.src = 'nightflow.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(nf); } catch (e) {}
+/* Calmer navigation: big buttons by job, a quiet header, a food-only Menu page with search (nav23.js, Nov 23 2026). Both boards. */
+try { var nv = document.createElement('script'); nv.src = 'nav23.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(nv); } catch (e) {}
