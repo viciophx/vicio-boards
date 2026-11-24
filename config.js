@@ -29,3 +29,5 @@ try { var vc = document.createElement('script'); vc.src = 'voicecount.js?v=' + D
 try { var bs = document.createElement('script'); bs.src = 'barsubmit.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(bs); } catch (e) {}
 /* Spanish for the Nov 21 to 23 additions (es23.js, Nov 23 2026). Both boards; loaded last. */
 try { var e23 = document.createElement('script'); e23.src = 'es23.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(e23); } catch (e) {}
+/* The night on the clock: sign-in gate, due times, solo list, closing handoff (nightflow.js, Nov 23 2026). FOH only. */
+try { var nf = document.createElement('script'); nf.src = 'nightflow.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(nf); } catch (e) {}
