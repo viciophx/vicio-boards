@@ -25,3 +25,7 @@ try { var bh = document.createElement('script'); bh.src = 'bohinv.js?v=' + Date.
 try { var ow = document.createElement('script'); ow.src = 'orderwhole.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(ow); } catch (e) {}
 /* Count the bar by voice (voicecount.js, Nov 22 2026). FOH only. */
 try { var vc = document.createElement('script'); vc.src = 'voicecount.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(vc); } catch (e) {}
+/* Submit and lock the bar count, email the order, phone layout (barsubmit.js, Nov 23 2026). FOH only. */
+try { var bs = document.createElement('script'); bs.src = 'barsubmit.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(bs); } catch (e) {}
+/* Spanish for the Nov 21 to 23 additions (es23.js, Nov 23 2026). Both boards; loaded last. */
+try { var e23 = document.createElement('script'); e23.src = 'es23.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(e23); } catch (e) {}
