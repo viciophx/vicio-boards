@@ -35,3 +35,5 @@ try { var nf = document.createElement('script'); nf.src = 'nightflow.js?v=' + Da
 try { var nv = document.createElement('script'); nv.src = 'nav23.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(nv); } catch (e) {}
 /* Navigation, round two: land on your list, what's next, bottom bar on phones, one row, dots, search, logo home (navplus.js, Nov 24 2026). Both boards. */
 try { var np = document.createElement('script'); np.src = 'navplus.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(np); } catch (e) {}
+/* Food menu as printed Nov 27 2026 (menu27.js). FOH only. */
+try { var m27 = document.createElement('script'); m27.src = 'menu27.js?v=' + Date.now(); (document.head || document.documentElement).appendChild(m27); } catch (e) {}
